@@ -9,10 +9,13 @@
     <script src="https://unpkg.com"></script>
     <style>
         body { font-family: Arial, sans-serif; padding: 0; margin: 0; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
-        #map { height: 35vh; width: 100%; }
+        #map { height: 30vh; width: 100%; }
         .container { padding: 15px; }
         .status-card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; margin-bottom: 15px; }
+        .finance-card { background: #e8f5e9; border: 1px solid #c8e6c9; padding: 12px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
+        .finance-card span { font-size: 20px; font-weight: bold; color: #2e7d32; }
         .order-card { background: #e3f2fd; border-left: 5px solid #2196f3; padding: 15px; border-radius: 8px; }
+        .comment-box { background: #fff; border-radius: 6px; padding: 8px; margin-top: 10px; font-style: italic; color: #555; border: 1px dashed #2196f3; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 14px; }
         .btn-go { background: #4caf50; color: white; }
         .btn-accept { background: #2196f3; color: white; }
@@ -25,6 +28,11 @@
 <body>
     <div id="map"></div>
     <div class="container">
+        <!-- Блок кошелька и заработка -->
+        <div class="finance-card">
+            💰 Ваш баланс за сегодня: <span id="driverBalance">0</span> ₸
+        </div>
+
         <div class="status-card">
             <h3>Статус: <span id="statusText" style="color: red;">Офлайн</span></h3>
             <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
@@ -32,9 +40,12 @@
 
         <div id="newOrder" style="display: none;" class="order-card">
             <h4>⚡ Новый заказ!</h4>
-            <p><strong>ID Заказа:</strong> <span id="orderIdText">12345</span></p>
             <p><strong>Расстояние поездки:</strong> <span id="orderDist">5.20</span> км</p>
             <p><strong>Рассчитанная стоимость:</strong> <span id="orderPrice">816</span> ₸</p>
+            
+            <!-- Поле отображения комментария от пассажира -->
+            <p><strong>💡 Комментарий клиента:</strong></p>
+            <div class="comment-box" id="orderComment">Подъехать к магазину, нужен пустой багажник</div>
             
             <div class="waiting-status free-wait" id="waitContainer">
                 <span id="waitTypeText">⏳ Бесплатное ожидание:</span> 
@@ -56,7 +67,8 @@
         let totalWaitSeconds = 0;
         let waitInterval;
         let basePrice = 816;
-        let currentOrderId = "12345"; // Симуляция ID текущего заказа
+        let driverBalance = 0; // Локальное хранилище баланса
+        let currentOrderId = "12345";
 
         const map = L.map('map').setView([43.3644, 77.1215], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -70,7 +82,11 @@
             if (isOnline) {
                 statusText.innerText = 'В сети'; statusText.style.color = 'green';
                 toggleBtn.innerText = 'Уйти с линии'; toggleBtn.style.background = '#f44336';
-                setTimeout(() => { orderBlock.style.display = 'block'; }, 2000);
+                setTimeout(() => { 
+                    // Имитируем прилет реального комментария
+                    document.getElementById('orderComment').innerText = "Подъехать к магазину 'Аян', нужен пустой багажник.";
+                    orderBlock.style.display = 'block'; 
+                }, 2000);
             } else {
                 statusText.innerText = 'Офлайн'; statusText.style.color = 'red';
                 toggleBtn.innerText = 'Выйти на линию'; toggleBtn.style.background = '#4caf50';
@@ -92,13 +108,17 @@
                     const paidMinutes = Math.ceil(paidSeconds / 60);
                     finalPrice += (paidMinutes * 25);
                 }
-                alert(`Поездка завершена!\nИтого к оплате: ${finalPrice} ₸.`);
+                
+                // Накручиваем баланс водителя
+                driverBalance += finalPrice;
+                document.getElementById('driverBalance').innerText = driverBalance;
+
+                alert(`Поездка завершена!\nИтого к оплате: ${finalPrice} ₸.\nСумма зачислена на баланс.`);
                 document.getElementById('newOrder').style.display = 'none';
                 resetWaiting();
             }
         });
 
-        // Кнопка режима ожидания
         document.getElementById('waitBtn').addEventListener('click', () => {
             isWaiting = !isWaiting;
             const waitBtn = document.getElementById('waitBtn');
@@ -109,13 +129,11 @@
                 waitBtn.style.background = "#f44336";
                 waitContainer.style.display = "block";
 
-                // АВТОМАТИЧЕСКОЕ УВЕДОМЛЕНИЕ: отправляем сигнал на локальный Python сервер
-                // В продакшене localhost заменяется на IP адрес вашего сервера
                 fetch('http://localhost:8080/api/driver', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ order_id: currentOrderId, action: 'arrived' })
-                }).catch(err => console.log("Для локального теста пушей запустите taxi_bot.py"));
+                }).catch(err => console.log("Тест уведомлений"));
 
                 waitInterval = setInterval(() => {
                     totalWaitSeconds++;
