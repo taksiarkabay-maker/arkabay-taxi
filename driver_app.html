@@ -17,7 +17,9 @@
         .btn-go { background: #4caf50; color: white; }
         .btn-accept { background: #2196f3; color: white; }
         .btn-wait { background: #ff9800; color: white; display: none; }
-        .waiting-status { display: none; margin-top: 10px; color: #ff9800; font-weight: bold; }
+        .waiting-status { display: none; margin-top: 10px; font-weight: bold; padding: 8px; border-radius: 6px; }
+        .free-wait { background: #fff3e0; color: #e65100; }
+        .paid-wait { background: #ffebee; color: #c62828; }
     </style>
 </head>
 <body>
@@ -30,12 +32,18 @@
 
         <div id="newOrder" style="display: none;" class="order-card">
             <h4>⚡ Новый заказ!</h4>
+            <p><strong>ID Заказа:</strong> <span id="orderIdText">12345</span></p>
             <p><strong>Расстояние поездки:</strong> <span id="orderDist">5.20</span> км</p>
-            <p><strong>Расчитанная стоимость:</strong> <span id="orderPrice">816</span> ₸</p>
-            <div class="waiting-status" id="waitContainer">⏳ Ожидание: <span id="waitMinutes">0</span> мин (+<span id="waitCost">0</span> ₸)</div>
+            <p><strong>Рассчитанная стоимость:</strong> <span id="orderPrice">816</span> ₸</p>
+            
+            <div class="waiting-status free-wait" id="waitContainer">
+                <span id="waitTypeText">⏳ Бесплатное ожидание:</span> 
+                <span id="waitMinutes">3:00</span>
+                <div style="font-size: 12px; font-weight: normal; margin-top: 4px;">Далее: 25 ₸/мин</div>
+            </div>
             
             <button id="acceptBtn" class="btn btn-accept">Принять заказ (20:00)</button>
-            <button id="waitBtn" class="btn btn-wait">⏱ Включить ожидание (25 ₸/мин)</button>
+            <button id="waitBtn" class="btn btn-wait">⏱ Включить ожидание</button>
         </div>
     </div>
 
@@ -45,9 +53,10 @@
 
         let isOnline = false;
         let isWaiting = false;
-        let waitTimer = 0;
+        let totalWaitSeconds = 0;
         let waitInterval;
-        let basePrice = 816; // Примерная базовая цена
+        let basePrice = 816;
+        let currentOrderId = "12345"; // Симуляция ID текущего заказа
 
         const map = L.map('map').setView([43.3644, 77.1215], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
@@ -61,10 +70,7 @@
             if (isOnline) {
                 statusText.innerText = 'В сети'; statusText.style.color = 'green';
                 toggleBtn.innerText = 'Уйти с линии'; toggleBtn.style.background = '#f44336';
-                
-                setTimeout(() => { 
-                    orderBlock.style.display = 'block'; 
-                }, 2000);
+                setTimeout(() => { orderBlock.style.display = 'block'; }, 2000);
             } else {
                 statusText.innerText = 'Офлайн'; statusText.style.color = 'red';
                 toggleBtn.innerText = 'Выйти на линию'; toggleBtn.style.background = '#4caf50';
@@ -77,12 +83,16 @@
             if(document.getElementById('acceptBtn').innerText.includes("Принять")) {
                 document.getElementById('acceptBtn').innerText = "🏁 Завершить поездку";
                 document.getElementById('acceptBtn').style.background = "#e91e63";
-                document.getElementById('waitBtn').style.display = "block"; // Показываем кнопку ожидания
+                document.getElementById('waitBtn').style.display = "block";
             } else {
-                // Завершение поездки
                 clearInterval(waitInterval);
-                let finalBill = basePrice + (waitTimer * 25);
-                alert(`Поездка успешно завершена!\nИтоговый чек к оплате: ${finalBill} ₸ (с учетом простоя).`);
+                let finalPrice = basePrice;
+                if (totalWaitSeconds > 180) {
+                    const paidSeconds = totalWaitSeconds - 180;
+                    const paidMinutes = Math.ceil(paidSeconds / 60);
+                    finalPrice += (paidMinutes * 25);
+                }
+                alert(`Поездка завершена!\nИтого к оплате: ${finalPrice} ₸.`);
                 document.getElementById('newOrder').style.display = 'none';
                 resetWaiting();
             }
@@ -99,15 +109,46 @@
                 waitBtn.style.background = "#f44336";
                 waitContainer.style.display = "block";
 
-                // Каждую секунду накручиваем "минуту" для быстрой проверки тарифа
+                // АВТОМАТИЧЕСКОЕ УВЕДОМЛЕНИЕ: отправляем сигнал на локальный Python сервер
+                // В продакшене localhost заменяется на IP адрес вашего сервера
+                fetch('http://localhost:8080/api/driver', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ order_id: currentOrderId, action: 'arrived' })
+                }).catch(err => console.log("Для локального теста пушей запустите taxi_bot.py"));
+
                 waitInterval = setInterval(() => {
-                    waitTimer++;
-                    document.getElementById('waitMinutes').innerText = waitTimer;
-                    document.getElementById('waitCost').innerText = waitTimer * 25;
-                    document.getElementById('orderPrice').innerText = basePrice + (waitTimer * 25);
+                    totalWaitSeconds++;
+                    const container = document.getElementById('waitContainer');
+                    const typeText = document.getElementById('waitTypeText');
+                    const minutesText = document.getElementById('waitMinutes');
+                    const priceText = document.getElementById('orderPrice');
+
+                    if (totalWaitSeconds <= 180) {
+                        let timeLeft = 180 - totalWaitSeconds;
+                        let m = Math.floor(timeLeft / 60);
+                        let s = timeLeft % 60;
+                        s = s < 10 ? "0" + s : s;
+                        container.className = "waiting-status free-wait";
+                        typeText.innerText = "⏳ Бесплатное ожидание:";
+                        minutesText.innerText = `${m}:${s}`;
+                        priceText.innerText = basePrice;
+                    } else {
+                        let paidSeconds = totalWaitSeconds - 180;
+                        let m = Math.floor(paidSeconds / 60);
+                        let s = paidSeconds % 60;
+                        m = m < 10 ? "0" + m : m;
+                        s = s < 10 ? "0" + s : s;
+                        let paidMinutesRounded = Math.ceil(paidSeconds / 60);
+                        let currentWaitCost = paidMinutesRounded * 25;
+                        container.className = "waiting-status paid-wait";
+                        typeText.innerText = "⚠️ Платное ожидание:";
+                        minutesText.innerText = `${m}:${s} (+${currentWaitCost} ₸)`;
+                        priceText.innerText = basePrice + currentWaitCost;
+                    }
                 }, 1000); 
             } else {
-                waitBtn.innerText = "⏱ Включить ожидание (25 ₸/мин)";
+                waitBtn.innerText = "⏱ Включить ожидание";
                 waitBtn.style.background = "#ff9800";
                 clearInterval(waitInterval);
             }
@@ -116,7 +157,7 @@
         function resetWaiting() {
             clearInterval(waitInterval);
             isWaiting = false;
-            waitTimer = 0;
+            totalWaitSeconds = 0;
             document.getElementById('acceptBtn').innerText = "Принять заказ (20:00)";
             document.getElementById('acceptBtn').style.background = "#2196f3";
             document.getElementById('waitBtn').style.display = "none";
