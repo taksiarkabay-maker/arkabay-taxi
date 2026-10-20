@@ -10,6 +10,7 @@
         .revenue { font-size: 24px; font-weight: bold; color: #2e7d32; }
         input { width: 100%; padding: 8px; margin: 5px 0 15px 0; box-sizing: border-box; }
         button { width: 100%; padding: 10px; background: #000; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .links-box { background: #f0f4f8; border-left: 4px solid #2481cc; padding: 12px; font-size: 13px; font-family: monospace; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -31,24 +32,50 @@
         <button id="saveBtn">Сохранить тарифы</button>
     </div>
 
+    <!-- Информационный блок со ссылками на экраны проекта -->
+    <div class="box">
+        <h4>🔗 Ссылки на экраны вашего проекта для BotFather и Кода:</h4>
+        <div class="links-box">
+            <strong>Пассажир (CLIENT_APP_URL):</strong><br>
+            https://github.io<br><br>
+            <strong>Водитель (DRIVER_APP_URL):</strong><br>
+            https://github.io<br><br>
+            <strong>Админ (ADMIN_APP_URL):</strong><br>
+            https://github.io
+        </div>
+    </div>
+
     <script>
+        /* 
+          ШПАРГАЛКА ДЛЯ ВСТАВКИ В ФАЙЛ taxi_bot.py:
+          CLIENT_APP_URL = 'https://github.io'
+          DRIVER_APP_URL = 'https://github.io'
+          ADMIN_APP_URL = 'https://github.io'
+        */
+
+        // Адрес бэкенда для запросов (пока тестируете локально, оставляем localhost, при запуске ngrok замените тут адрес)
+        const BACKEND_URL = 'http://localhost:8080';
+
         function loadAdminData() {
-            fetch('http://localhost:8080/api/admin_stats')
+            fetch(`${BACKEND_URL}/api/admin_stats`)
                 .then(r => r.json()).then(data => {
                     document.getElementById('totalRevenue').innerText = data.revenue;
                     document.getElementById('basePrice').value = data.base_price;
                     document.getElementById('perKm').value = data.per_km_price;
-                });
+                }).catch(err => console.log("Для получения статистики запустите taxi_bot.py"));
         }
         
         document.getElementById('saveBtn').addEventListener('click', () => {
-            fetch('http://localhost:8080/api/update_tariffs', {
+            fetch(`${BACKEND_URL}/api/update_tariffs`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     base_price: parseFloat(document.getElementById('basePrice').value),
                     per_km_price: parseFloat(document.getElementById('perKm').value)
                 })
-            }).then(() => alert('Тарифы успешно обновлены во всей системе!'));
+            }).then(r => {
+                if(r.ok) alert('Тарифы успешно обновлены во всей системе такси!');
+            }).catch(err => alert('Ошибка соединения с сервером бота.'));
         });
 
         loadAdminData();
