@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель Водителя</title>
+    <!-- Внутренний скрипт Telegram без пробелов -->
     <script src="https://telegram.org"></script>
     <style>
         body { font-family: Arial, sans-serif; padding: 15px; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
@@ -12,7 +13,6 @@
         .order { background: #e3f2fd; border-left: 5px solid #2196f3; display: none; }
         .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-go { background: #4caf50; color: white; }
-        .btn-wait { background: #ff9800; color: white; }
     </style>
 </head>
 <body>
@@ -23,29 +23,28 @@
     </div>
 
     <div id="orderCard" class="card order">
-        <h4>⚡ РЕАЛЬНЫЙ ЗАКАЗ!</h4>
+        <h4>⚡ НОВЫЙ ЗАКАЗ В СИСТЕМЕ!</h4>
         <p><strong>Откуда:</strong> <span id="oFrom"></span></p>
         <p><strong>Куда:</strong> <span id="oTo"></span></p>
         <p><strong>Оплата:</strong> <span id="oPay" style="color:blue;font-weight:bold;"></span></p>
         <p><strong>Комментарий:</strong> <span id="oComm"></span></p>
         <p><strong>Сумма:</strong> <span id="oPrice"></span> ₸</p>
         <button id="actionBtn" class="btn btn-go" style="background:#2196f3;">Принять заказ</button>
-        <button id="waitBtn" class="btn btn-wait" style="display:none;">⏱ Ожидание</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
         let isOnline = false, currentOrderId = null, step = 0;
         let drId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 999;
+        const BACKEND_URL = 'http://localhost:8080'; // При использовании ngrok замените на адрес ngrok
 
-        // Обновляем баланс при старте
         setInterval(() => {
             if(!isOnline) return;
-            fetch(`http://localhost:8080/api/driver_status?driver_id=${drId}`)
+            fetch(`${BACKEND_URL}/api/driver_status?driver_id=${drId}`)
                 .then(r => r.json()).then(d => { document.getElementById('balance').innerText = d.balance; });
             
             if(!currentOrderId) {
-                fetch('http://localhost:8080/api/get_active_orders')
+                fetch(`${BACKEND_URL}/api/get_active_orders`)
                     .then(r => r.json()).then(orders => {
                         if(orders.length > 0) {
                             let o = orders[0]; currentOrderId = o.id;
@@ -70,27 +69,24 @@
 
         document.getElementById('actionBtn').addEventListener('click', () => {
             if (step === 0) {
-                // Принять
-                fetch('http://localhost:8080/api/order_action', {
+                fetch(`${BACKEND_URL}/api/order_action`, {
                     method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'accept' })
                 });
                 document.getElementById('actionBtn').innerText = "🚖 Я на месте";
                 document.getElementById('actionBtn').style.background = '#ff9800';
                 step = 1;
             } else if (step === 1) {
-                // На месте
-                fetch('http://localhost:8080/api/order_action', {
+                fetch(`${BACKEND_URL}/api/order_action`, {
                     method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'arrived' })
                 });
                 document.getElementById('actionBtn').innerText = "🏁 Завершить поездку";
                 document.getElementById('actionBtn').style.background = '#e91e63';
                 step = 2;
             } else if (step === 2) {
-                // Завершить
-                fetch('http://localhost:8080/api/order_action', {
+                fetch(`${BACKEND_URL}/api/order_action`, {
                     method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'complete' })
                 });
-                alert('Поездка внесена в систему!');
+                alert('Поездка успешно завершена!');
                 document.getElementById('orderCard').style.display = 'none';
                 currentOrderId = null; step = 0;
                 document.getElementById('actionBtn').innerText = "Принять заказ";
