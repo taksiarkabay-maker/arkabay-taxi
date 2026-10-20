@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси 2ГИС</title>
-    <!-- Подключаем Telegram Web App и стили Leaflet для карт 2ГИС -->
-    <script src="https://telegram.org"></script>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <script src="https://unpkg.com"></script>
+    <!-- ВНИМАНИЕ: УДАЛИТЕ ПРОБЕЛЫ В СТРОКАХ 7, 8 И 9 ПЕРЕД СОХРАНЕНИЕМ -->
+    <script src="https://telegram.org/js/telegram-web-app. js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: var(--tg-theme-secondary-bg-color, #f5f5f5); }
         .header img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        #map { height: 35vh; width: 100%; }
+        #map { height: 35vh; width: 100%; background: #e5e3df; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
         .hint-text { font-size: 11px; color: #ff9800; font-weight: bold; margin: -5px 0 10px 2px; display: block; line-height: 1.3; }
@@ -30,12 +30,11 @@
         <h2>Заказ Такси Аркабай - Панфилово (2ГИС)</h2>
     </div>
     
-    <!-- Сюда загрузится карта -->
     <div id="map"></div>
     
     <div class="container">
         <button id="geoBtn" class="geo-btn">📍 Автоматически определить где я</button>
-        <span class="hint-text">💡 Кликните на карту 2ГИС для выбора точки Б или переместите синий маркер точки А.</span>
+        <span class="hint-text">💡 Кликните на карту 2ГИС для выбора точки Б или переместите маркер точки А.</span>
         
         <div class="input-group">
             <input type="text" id="from" placeholder="Откуда (Точка А)">
@@ -62,31 +61,27 @@
 
         let myMap;
         let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; // Центр зоны Аркабай-Панфилово
+        let latA = 43.3644, lngA = 77.1215; 
         let latB = null, lngB = null;
         let distanceKm = 0, finalPrice = 400;
         let isManualMode = false;
         let tariffs = { base_price: 400, per_km_price: 80 };
 
-        // Подгружаем живые тарифы от вашего Python-бэкенда
         fetch('http://localhost:8080/api/get_tariffs')
             .then(r => r.json())
             .then(data => { tariffs = data; calculatePrice(); })
             .catch(() => { calculatePrice(); });
 
-        // Инициализируем карту с тайлами 2ГИС
+        // Инициализируем карту Leaflet с использованием тайлов 2ГИС
         myMap = L.map('map').setView([latA, lngA], 13);
         
-        // Подключаем официальную спутниковую/картографическую подложку 2ГИС
         L.tileLayer('https://tile{s}://{x}&y={y}&z={z}', {
             subdomains: ['0', '1', '2', '3'],
             attribution: '© 2GIS'
-        }).addTo(map);
+        }).addTo(myMap);
 
-        // Ставим перемещаемый маркер Точки А
         markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap).bindPopup('Откуда (Точка А)').openPopup();
 
-        // Обработка перемещения Точки А
         markerA.on('dragend', function () {
             const position = markerA.getLatLng();
             latA = position.lat; lngA = position.lng;
@@ -94,7 +89,6 @@
             geocodeAddress(latA, lngA, 'from');
         });
 
-        // Клик по карте 2ГИС ставит Точку Б
         myMap.on('click', function (e) {
             latB = e.latlng.lat; lngB = e.latlng.lng;
             isManualMode = false;
@@ -102,7 +96,7 @@
             if (markerB) {
                 markerB.setLatLng(e.latlng);
             } else {
-                markerB = L.marker([latB, lngB], {icon: L.icon({iconUrl: 'https://google.com'}), draggable: true}).addTo(myMap).bindPopup('Куда (Точка Б)').openPopup();
+                markerB = L.marker([latB, lngB], {draggable: true}).addTo(myMap).bindPopup('Куда (Точка Б)').openPopup();
                 
                 markerB.on('dragend', function () {
                     const pos = markerB.getLatLng();
@@ -113,12 +107,12 @@
             geocodeAddress(latB, lngB, 'to');
         });
 
-        // Функция распознавания адресов по API 2ГИС / OpenStreetMap
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.classList.add('loading-input');
-            inputField.value = "⏳ 2ГИС распознает адрес...";
+            inputField.value = "⏳ Распознаем адрес по 2ГИС...";
 
+            // Используем стабильный геокодер Nominatim (подходит для Leaflet слоев 2ГИС)
             fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
                 .then(r => r.json())
                 .then(data => {
@@ -126,20 +120,19 @@
                     if (data.address) {
                         const road = data.address.road || "";
                         const house = data.address.house_number || "";
-                        const village = data.address.village || data.address.suburb || data.address.town || "";
-                        inputField.value = `${village} ${road} ${house}`.trim() || "Выбрано на карте";
+                        const village = data.address.village || data.address.suburb || data.address.town || data.address.hamlet || "";
+                        inputField.value = `${village} ${road} ${house}`.trim() || "Точка на карте";
                     } else {
-                        inputField.value = `Геопозиция: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        inputField.value = `Координаты: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
                     calculatePrice();
                 }).catch(() => {
                     inputField.classList.remove('loading-input');
-                    inputField.value = `Точка зафиксирована`;
+                    inputField.value = `Геометка зафиксирована`;
                     calculatePrice();
                 });
         }
 
-        // Анализатор текста для фиксированных зон (если вводят руками с клавиатуры)
         function getZone(addressText) {
             const txt = addressText.toLowerCase();
             if (txt.includes('аркабай') || txt.includes('аркабаи')) return 'arkabay';
@@ -149,7 +142,6 @@
             return 'unknown';
         }
 
-        // Расчет стоимости
         function calculatePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
@@ -170,7 +162,6 @@
                 else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (До города)`; }
             } else {
                 if (latA && latB) {
-                    // Вычисление расстояния по формуле Haversine
                     const R = 6371;
                     const dLat = (latB - latA) * Math.PI / 180;
                     const dLon = (lngB - lngA) * Math.PI / 180;
@@ -183,23 +174,22 @@
             }
         }
 
-        // Авто-геолокация по GPS устройства
-        document.getElementById('geoBtn').addEventListener('click', () => {if (navigator.geolocation) {
-document.getElementById('from').value = "⏳ Запрос GPS координат...";
-navigator.geolocation.getCurrentPosition((position) => {
-latA = position.coords.latitude; lngA = position.coords.longitude;
-isManualMode = false;
-myMap.setView([latA, lngA], 15);
-markerA.setLatLng([latA, lngA]);
-geocodeAddress(latA, lngA, 'from');
+        document.getElementById('geoBtn').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                document.getElementById('from').value = "⏳ Запрос GPS координат...";
+                navigator.geolocation.getCurrentPosition((position) => {
+                    latA = position.coords.latitude; lngA = position.coords.longitude;
+                    isManualMode = false;
+                    myMap.setView([latA, lngA], 15);
+                    markerA.setLatLng([latA, lngA]);
+                    geocodeAddress(latA, lngA, 'from');
 }, () => {
-alert('Ошибка GPS. Введите адрес вручную.');
+alert('Включите GPS на устройстве.');
 });
 }
 });
 document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
-// Первичное геокодирование точки старта при загрузке
 geocodeAddress(latA, lngA, 'from');
 document.getElementById('orderBtn').addEventListener('click', () => {
 const fromVal = document.getElementById('from').value;
@@ -214,4 +204,3 @@ payment: document.getElementById('paymentMethod').value
 }));
 tg.close();
 });
-
