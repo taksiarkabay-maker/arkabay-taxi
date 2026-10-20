@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси</title>
+    <!-- Полные ссылки на библиотеки Telegram и Leaflet Карт -->
     <script src="https://telegram.org"></script>
     <link rel="stylesheet" href="https://unpkg.com" />
     <script src="https://unpkg.com"></script>
@@ -24,10 +25,15 @@
         <img src="logo.png" alt="Taxi Logo">
         <h2>Заказ Такси Аркабай - Панфилово</h2>
     </div>
+
     <div id="map"></div>
     <div class="container">
-        <div class="input-group"><input type="text" id="from" placeholder="Откуда (Точка А)"></div>
-        <div class="input-group"><input type="text" id="to" placeholder="Куда (Точка Б)"></div>
+        <div class="input-group">
+            <input type="text" id="from" placeholder="Откуда (Точка А)">
+        </div>
+        <div class="input-group">
+            <input type="text" id="to" placeholder="Куда (Точка Б)">
+        </div>
         <div class="input-group">
             <select id="tariff">
                 <option value="эконом">Эконом</option>
@@ -37,19 +43,36 @@
         </div>
         <button id="orderBtn">Заказать такси</button>
     </div>
+
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const map = L.map('map').setView([43.3644, 77.1724], 13);
+
+        // Центрируем карту Талгарского района между поселками
+        const map = L.map('map').setView([43.3644, 77.1215], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        L.marker([43.3761, 77.1539]).addTo(map).bindPopup('п. Аркабай');
-        L.marker([43.3512, 77.1915]).addTo(map).bindPopup('п. Панфилово');
+
+        // Ставим метки населенных пунктов
+        L.marker([43.3800, 77.1100]).addTo(map).bindPopup('п. Аркабай');
+        L.marker([43.3500, 77.1350]).addTo(map).bindPopup('п. Панфилово');
+
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
             const tariff = document.getElementById('tariff').value;
-            if (!fromText || !toText) { alert('Пожалуйста, заполните адреса!'); return; }
-            const orderData = { from: fromText, to: toText, tariff: tariff, price: Math.floor(Math.random() * 300) + 400 };
+
+            if (!fromText || !toText) {
+                alert('Пожалуйста, заполните адреса!');
+                return;
+            }
+
+            const orderData = {
+                from: fromText,
+                to: toText,
+                tariff: tariff,
+                price: Math.floor(Math.random() * 300) + 400
+            };
+
             tg.sendData(JSON.stringify(orderData));
             tg.close();
         });
