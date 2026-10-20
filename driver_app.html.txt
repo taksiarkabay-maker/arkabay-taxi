@@ -1,0 +1,97 @@
+html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель Водителя</title>
+    <script src="https://telegram.org"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 15px; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
+        .status-card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; margin-bottom: 20px; }
+        .order-card { background: #e3f2fd; border-left: 5px solid #2196f3; padding: 15px; border-radius: 8px; margin-top: 15px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-go { background: #4caf50; color: white; }
+        .btn-accept { background: #2196f3; color: white; }
+    </style>
+</head>
+<body>
+    <div class="status-card">
+        <h3>Вы сейчас: <span id="statusText" style="color: red;">Офлайн</span></h3>
+        <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
+    </div>
+
+    <div id="newOrder" style="display: none;" class="order-card">
+        <h4>⚡ Новый заказ!</h4>
+        <p><strong>Откуда:</strong> ул. Ленина, 12</p>
+        <p><strong>Куда:</strong> пр. Мира, 45</p>
+        <p><strong>Стоимость:</strong> 450 руб.</p>
+        <button id="acceptBtn" class="btn btn-accept">Принять заказ (20:00)</button>
+    </div>
+
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        let isOnline = false;
+        let timerInterval;
+
+        document.getElementById('toggleStatus').addEventListener('click', () => {
+            isOnline = !isOnline;
+            const statusText = document.getElementById('statusText');
+            const toggleBtn = document.getElementById('toggleStatus');
+            const orderBlock = document.getElementById('newOrder');
+
+            if (isOnline) {
+                statusText.innerText = 'В сети';
+                statusText.style.color = 'green';
+                toggleBtn.innerText = 'Уйти с линии';
+                toggleBtn.style.background = '#f44336';
+                
+                // Имитируем появление заказа через 3 секунды после выхода на линию
+                setTimeout(() => { 
+                    orderBlock.style.display = 'block'; 
+                    startDriverTimer(20 * 60); // Запускаем таймер на 20 минут (в секундах)
+                }, 3000);
+            } else {
+                statusText.innerText = 'Офлайн';
+                statusText.style.color = 'red';
+                toggleBtn.innerText = 'Выйти на линию';
+                toggleBtn.style.background = '#4caf50';
+                orderBlock.style.display = 'none';
+                clearInterval(timerInterval);
+            }
+        });
+
+        // Функция таймера для водителя
+        function startDriverTimer(duration) {
+            let timer = duration, minutes, seconds;
+            const acceptBtn = document.getElementById('acceptBtn');
+            
+            clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                // Обновляем текст на кнопке, показывая оставшееся время
+                acceptBtn.innerText = `Принять заказ (${minutes}:${seconds})`;
+
+                if (--timer < 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('newOrder').style.display = 'none';
+                    alert('Время ожидания (20 минут) истекло. Заказ отменен.');
+                }
+            }, 1000);
+        }
+
+        document.getElementById('acceptBtn').addEventListener('click', () => {
+            clearInterval(timerInterval);
+            alert('Заказ принят! Направляйтесь к клиенту.');
+            document.getElementById('newOrder').style.display = 'none';
+        });
+    </script>
+</body>
+</html>

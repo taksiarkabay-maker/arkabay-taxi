@@ -1,0 +1,106 @@
+html
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Заказ Такси</title>
+    <!-- Подключаем стили Telegram и карты -->
+    <script src="https://telegram.org"></script>
+    <link rel="stylesheet" href="https://unpkg.com" />
+    <script src="https://unpkg.com"></script>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
+        
+        /* Стили для шапки с вашим логотипом */
+        .header {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 15px 10px 5px 10px;
+            background-color: var(--tg-theme-secondary-bg-color, #f5f5f5);
+        }
+        .header img {
+            width: 80px;
+            height: 80px;
+            object-fit: contain;
+            border-radius: 50%;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .header h2 {
+            margin: 8px 0 0 0;
+            font-size: 18px;
+            font-weight: bold;
+        }
+
+        #map { height: 40vh; width: 100%; }
+        .container { padding: 15px; }
+        .input-group { margin-bottom: 10px; }
+        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; }
+        button { width: 100%; padding: 12px; background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <!-- Фирменная шапка с вашей картинкой -->
+    <div class="header">
+        <img src="logo.png" alt="Taxi Logo">
+        <h2>Заказ Такси Аркабай - Панфилово</h2>
+    </div>
+
+    <div id="map"></div>
+    <div class="container">
+        <div class="input-group">
+            <input type="text" id="from" placeholder="Откуда (Точка А)">
+        </div>
+        <div class="input-group">
+            <input type="text" id="to" placeholder="Куда (Точка Б)">
+        </div>
+        <div class="input-group">
+            <select id="tariff">
+                <option value="эконом">Эконом</option>
+                <option value="комфорт">Комфорт</option>
+                <option value="бизнес">Бизнес</option>
+            </select>
+        </div>
+        <button id="orderBtn">Заказать такси</button>
+    </div>
+
+    <script>
+        // Инициализация Telegram WebApp
+        const tg = window.Telegram.WebApp;
+        tg.expand(); // Развернуть на весь экран
+
+        // Инициализация карты: координаты центра между Аркабай и Панфилово, масштаб 13
+        const map = L.map('map').setView([43.3762, 77.0850], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+        // Добавим маркеры для ориентира (опционально, чтобы пользователь сразу видел ключевые точки)
+        L.marker([43.3931, 77.0701]).addTo(map).bindPopup('п. Аркабай');
+        L.marker([43.3593, 77.1000]).addTo(map).bindPopup('п. Панфилово');
+
+        // Логика кнопки заказа
+        document.getElementById('orderBtn').addEventListener('click', () => {
+            const fromText = document.getElementById('from').value;
+            const toText = document.getElementById('to').value;
+            const tariff = document.getElementById('tariff').value;
+
+            if (!fromText || !toText) {
+                alert('Пожалуйста, заполните адреса!');
+                return;
+            }
+
+            // Формируем данные заказа
+            const orderData = {
+                from: fromText,
+                to: toText,
+                tariff: tariff,
+                price: Math.floor(Math.random() * 300) + 400 // Симуляция расчета цены для этой дистанции
+            };
+
+            // Отправляем данные обратно в бота Telegram
+            tg.sendData(JSON.stringify(orderData));
+            tg.close();
+        });
+    </script>
+</body>
+</html>
