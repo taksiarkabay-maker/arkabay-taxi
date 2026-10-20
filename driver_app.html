@@ -1,103 +1,127 @@
-import asyncio
-import json
-import math # Импортируем математику для расчета километров
-from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command
-from aiogram.types import WebAppInfo, InlineKeyboardMarkup, InlineKeyboardButton
-from models import Session, Order, Driver
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Панель Водителя</title>
+    <script src="https://telegram.org"></script>
+    <link rel="stylesheet" href="https://unpkg.com" />
+    <script src="https://unpkg.com"></script>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 0; margin: 0; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
+        #map { height: 35vh; width: 100%; }
+        .container { padding: 15px; }
+        .status-card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; margin-bottom: 15px; }
+        .order-card { background: #e3f2fd; border-left: 5px solid #2196f3; padding: 15px; border-radius: 8px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 14px; }
+        .btn-go { background: #4caf50; color: white; }
+        .btn-accept { background: #2196f3; color: white; }
+        .btn-wait { background: #ff9800; color: white; display: none; }
+        .waiting-status { display: none; margin-top: 10px; color: #ff9800; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div class="container">
+        <div class="status-card">
+            <h3>Статус: <span id="statusText" style="color: red;">Офлайн</span></h3>
+            <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
+        </div>
 
-API_TOKEN = '8829142018:AAFGipJuDHhnlSy7TKOW_o7LcqvORMPpqY0'
+        <div id="newOrder" style="display: none;" class="order-card">
+            <h4>⚡ Новый заказ!</h4>
+            <p><strong>Расстояние поездки:</strong> <span id="orderDist">5.20</span> км</p>
+            <p><strong>Расчитанная стоимость:</strong> <span id="orderPrice">816</span> ₸</p>
+            <div class="waiting-status" id="waitContainer">⏳ Ожидание: <span id="waitMinutes">0</span> мин (+<span id="waitCost">0</span> ₸)</div>
+            
+            <button id="acceptBtn" class="btn btn-accept">Принять заказ (20:00)</button>
+            <button id="waitBtn" class="btn btn-wait">⏱ Включить ожидание (25 ₸/мин)</button>
+        </div>
+    </div>
 
-# Укажите здесь ваши ссылки на GitHub Pages (соберите их без пробелов)
-CLIENT_APP_URL = 'https://github.io'
-DRIVER_APP_URL = 'https://github.io'
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
 
-bot = Bot(token=API_TOKEN)
-dp = Dispatcher()
+        let isOnline = false;
+        let isWaiting = false;
+        let waitTimer = 0;
+        let waitInterval;
+        let basePrice = 816; // Примерная базовая цена
 
-# Функция расчета расстояния в километрах между GPS координатами (Формула Haversine)
-def calculate_distance(lat1, lon1, lat2, lon2):
-    R = 6371.0 # Радиус Земли в километрах
-    
-    lat1_rad = math.radians(lat1)
-    lon1_rad = math.radians(lon1)
-    lat2_rad = math.radians(lat2)
-    lon2_rad = math.radians(lon2)
-    
-    dlon = lon2_rad - lon1_rad
-    dlat = lat2_rad - lat1_rad
-    
-    a = math.sin(dlat / 2)**2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    
-    return round(R * c, 2) # Возвращает расстояние в км с округлением до сотых
+        const map = L.map('map').setView([43.3644, 77.1215], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-@dp.message(Command("start"))
-async def cmd_start(message: types.Message):
-    markup = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="   Вызвать такси (Аркабай - Панфилово)", web_app=WebAppInfo(url=CLIENT_APP_URL))],
-        [InlineKeyboardButton(text="💼 Панель водителя", web_app=WebAppInfo(url=DRIVER_APP_URL))]
-    ])
-    await message.answer(
-        f"Привет, {message.from_user.full_name}! Экосистема такси с автоопределением км готова к работе.\n\n"
-        f"Нажмите нужную кнопку ниже:", reply_markup=markup
-    )
+        document.getElementById('toggleStatus').addEventListener('click', () => {
+            isOnline = !isOnline;
+            const statusText = document.getElementById('statusText');
+            const toggleBtn = document.getElementById('toggleStatus');
+            const orderBlock = document.getElementById('newOrder');
 
-@dp.message(lambda message: message.web_app_data is not None)
-async def handle_web_app_data(message: types.Message):
-    try:
-        data = json.loads(message.web_app_data.data)
-        from_adr = data.get("from")
-        to_adr = data.get("to")
-        tariff = data.get("tariff")
-        price = data.get("price")
-        p_lat = data.get("lat")
-        p_lng = data.get("lng")
+            if (isOnline) {
+                statusText.innerText = 'В сети'; statusText.style.color = 'green';
+                toggleBtn.innerText = 'Уйти с линии'; toggleBtn.style.background = '#f44336';
+                
+                setTimeout(() => { 
+                    orderBlock.style.display = 'block'; 
+                }, 2000);
+            } else {
+                statusText.innerText = 'Офлайн'; statusText.style.color = 'red';
+                toggleBtn.innerText = 'Выйти на линию'; toggleBtn.style.background = '#4caf50';
+                orderBlock.style.display = 'none';
+                resetWaiting();
+            }
+        });
 
-        session = Session()
-        new_order = Order(
-            user_id=message.from_user.id, from_address=from_adr, to_address=to_adr,
-            price=price, passenger_lat=p_lat, passenger_lng=p_lng, status='created'
-        )
-        session.add(new_order)
-        session.commit()
-        order_id = new_order.id
-        
-        # Симуляция: Ищем в базе водителя со статусом 'online' и считаем км до него
-        closest_driver = session.query(Driver).filter(Driver.status == 'online').first()
-        distance_msg = ""
-        
-        if closest_driver and closest_driver.lat and closest_driver.lng:
-            # Считаем точные километры от водителя до пассажира
-            km = calculate_distance(p_lat, p_lng, closest_driver.lat, closest_driver.lng)
-            distance_msg = f"\n🚗 Ближайший водитель {closest_driver.name} найден в {km} км от вас!"
-        else:
-            distance_msg = f"\n🔎 Ищем свободные машины в районе Аркабай - Панфилово..."
+        document.getElementById('acceptBtn').addEventListener('click', () => {
+            if(document.getElementById('acceptBtn').innerText.includes("Принять")) {
+                document.getElementById('acceptBtn').innerText = "🏁 Завершить поездку";
+                document.getElementById('acceptBtn').style.background = "#e91e63";
+                document.getElementById('waitBtn').style.display = "block"; // Показываем кнопку ожидания
+            } else {
+                // Завершение поездки
+                clearInterval(waitInterval);
+                let finalBill = basePrice + (waitTimer * 25);
+                alert(`Поездка успешно завершена!\nИтоговый чек к оплате: ${finalBill} ₸ (с учетом простоя).`);
+                document.getElementById('newOrder').style.display = 'none';
+                resetWaiting();
+            }
+        });
 
-        session.close()
+        // Кнопка режима ожидания
+        document.getElementById('waitBtn').addEventListener('click', () => {
+            isWaiting = !isWaiting;
+            const waitBtn = document.getElementById('waitBtn');
+            const waitContainer = document.getElementById('waitContainer');
 
-        await message.answer(
-            f"✅ Заказ №{order_id} создан!\n\n"
-            f"📍 Откуда: {from_adr}\n"
-            f"🏁 Куда: {to_adr}\n"
-            f"💵 Стоимость: {price} ₸{distance_msg}"
-        )
-        
-        await bot.send_location(chat_id=message.chat.id, latitude=p_lat, longitude=p_lng)
-        asyncio.create_task(check_order_timeout(order_id, message.chat.id))
+            if (isWaiting) {
+                waitBtn.innerText = "🛑 Выключить ожидание";
+                waitBtn.style.background = "#f44336";
+                waitContainer.style.display = "block";
 
-    except Exception as e:
-        await message.answer("⚠ Ошибка обработки данных.")
+                // Каждую секунду накручиваем "минуту" для быстрой проверки тарифа
+                waitInterval = setInterval(() => {
+                    waitTimer++;
+                    document.getElementById('waitMinutes').innerText = waitTimer;
+                    document.getElementById('waitCost').innerText = waitTimer * 25;
+                    document.getElementById('orderPrice').innerText = basePrice + (waitTimer * 25);
+                }, 1000); 
+            } else {
+                waitBtn.innerText = "⏱ Включить ожидание (25 ₸/мин)";
+                waitBtn.style.background = "#ff9800";
+                clearInterval(waitInterval);
+            }
+        });
 
-async def check_order_timeout(order_id: int, user_chat_id: int):
-    await asyncio.sleep(1200)
-    session = Session()
-    order = session.query(Order).filter(Order.id == order_id).first()
-    if order and order.status == 'created':
-        order.status = 'cancelled'
-        session.commit()
-        await bot.send_message(chat_id=user_chat_id, text="⏳ Заказ отменен по таймауту.")
-    session.close()
-
-if __name__ == '__main__':
-    asyncio.run(dp.start_polling(bot))
+        function resetWaiting() {
+            clearInterval(waitInterval);
+            isWaiting = false;
+            waitTimer = 0;
+            document.getElementById('acceptBtn').innerText = "Принять заказ (20:00)";
+            document.getElementById('acceptBtn').style.background = "#2196f3";
+            document.getElementById('waitBtn').style.display = "none";
+            document.getElementById('waitContainer').style.display = "none";
+        }
+    </script>
+</body>
+</html>
