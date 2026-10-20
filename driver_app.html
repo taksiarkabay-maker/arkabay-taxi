@@ -5,182 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель Водителя</title>
     <script src="https://telegram.org"></script>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <script src="https://unpkg.com"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 0; margin: 0; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
-        #map { height: 30vh; width: 100%; }
-        .container { padding: 15px; }
-        .status-card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; margin-bottom: 15px; }
-        .finance-card { background: #e8f5e9; border: 1px solid #c8e6c9; padding: 12px; border-radius: 10px; margin-bottom: 15px; text-align: center; }
-        .finance-card span { font-size: 20px; font-weight: bold; color: #2e7d32; }
-        .order-card { background: #e3f2fd; border-left: 5px solid #2196f3; padding: 15px; border-radius: 8px; }
-        .comment-box { background: #fff; border-radius: 6px; padding: 8px; margin-top: 10px; font-style: italic; color: #555; border: 1px dashed #2196f3; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; font-size: 14px; }
+        body { font-family: Arial, sans-serif; padding: 15px; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
+        .card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
+        .finance { background: #e8f5e9; color: #2e7d32; text-align: center; font-size: 18px; font-weight: bold; }
+        .order { background: #e3f2fd; border-left: 5px solid #2196f3; display: none; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
         .btn-go { background: #4caf50; color: white; }
-        .btn-accept { background: #2196f3; color: white; }
-        .btn-wait { background: #ff9800; color: white; display: none; }
-        .waiting-status { display: none; margin-top: 10px; font-weight: bold; padding: 8px; border-radius: 6px; }
-        .free-wait { background: #fff3e0; color: #e65100; }
-        .paid-wait { background: #ffebee; color: #c62828; }
+        .btn-wait { background: #ff9800; color: white; }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    <div class="container">
-        <!-- Блок кошелька и заработка -->
-        <div class="finance-card">
-            💰 Ваш баланс за сегодня: <span id="driverBalance">0</span> ₸
-        </div>
+    <div class="card finance">💰 Баланс: <span id="balance">0</span> ₸</div>
+    <div class="card" style="text-align:center;">
+        <h3>Статус: <span id="status" style="color:red;">Офлайн</span></h3>
+        <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
+    </div>
 
-        <div class="status-card">
-            <h3>Статус: <span id="statusText" style="color: red;">Офлайн</span></h3>
-            <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
-        </div>
-
-        <div id="newOrder" style="display: none;" class="order-card">
-            <h4>⚡ Новый заказ!</h4>
-            <p><strong>Расстояние поездки:</strong> <span id="orderDist">5.20</span> км</p>
-            <p><strong>Рассчитанная стоимость:</strong> <span id="orderPrice">816</span> ₸</p>
-            
-            <!-- Поле отображения комментария от пассажира -->
-            <p><strong>💡 Комментарий клиента:</strong></p>
-            <div class="comment-box" id="orderComment">Подъехать к магазину, нужен пустой багажник</div>
-            
-            <div class="waiting-status free-wait" id="waitContainer">
-                <span id="waitTypeText">⏳ Бесплатное ожидание:</span> 
-                <span id="waitMinutes">3:00</span>
-                <div style="font-size: 12px; font-weight: normal; margin-top: 4px;">Далее: 25 ₸/мин</div>
-            </div>
-            
-            <button id="acceptBtn" class="btn btn-accept">Принять заказ (20:00)</button>
-            <button id="waitBtn" class="btn btn-wait">⏱ Включить ожидание</button>
-        </div>
+    <div id="orderCard" class="card order">
+        <h4>⚡ РЕАЛЬНЫЙ ЗАКАЗ!</h4>
+        <p><strong>Откуда:</strong> <span id="oFrom"></span></p>
+        <p><strong>Куда:</strong> <span id="oTo"></span></p>
+        <p><strong>Оплата:</strong> <span id="oPay" style="color:blue;font-weight:bold;"></span></p>
+        <p><strong>Комментарий:</strong> <span id="oComm"></span></p>
+        <p><strong>Сумма:</strong> <span id="oPrice"></span> ₸</p>
+        <button id="actionBtn" class="btn btn-go" style="background:#2196f3;">Принять заказ</button>
+        <button id="waitBtn" class="btn btn-wait" style="display:none;">⏱ Ожидание</button>
     </div>
 
     <script>
         const tg = window.Telegram.WebApp;
-        tg.expand();
+        let isOnline = false, currentOrderId = null, step = 0;
+        let drId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 999;
 
-        let isOnline = false;
-        let isWaiting = false;
-        let totalWaitSeconds = 0;
-        let waitInterval;
-        let basePrice = 816;
-        let driverBalance = 0; // Локальное хранилище баланса
-        let currentOrderId = "12345";
-
-        const map = L.map('map').setView([43.3644, 77.1215], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+        // Обновляем баланс при старте
+        setInterval(() => {
+            if(!isOnline) return;
+            fetch(`http://localhost:8080/api/driver_status?driver_id=${drId}`)
+                .then(r => r.json()).then(d => { document.getElementById('balance').innerText = d.balance; });
+            
+            if(!currentOrderId) {
+                fetch('http://localhost:8080/api/get_active_orders')
+                    .then(r => r.json()).then(orders => {
+                        if(orders.length > 0) {
+                            let o = orders[0]; currentOrderId = o.id;
+                            document.getElementById('oFrom').innerText = o.from_address;
+                            document.getElementById('oTo').innerText = o.to_address;
+                            document.getElementById('oPay').innerText = o.payment_method;
+                            document.getElementById('oComm').innerText = o.comment;
+                            document.getElementById('oPrice').innerText = o.price;
+                            document.getElementById('orderCard').style.display = 'block';
+                        }
+                    });
+            }
+        }, 3000);
 
         document.getElementById('toggleStatus').addEventListener('click', () => {
             isOnline = !isOnline;
-            const statusText = document.getElementById('statusText');
-            const toggleBtn = document.getElementById('toggleStatus');
-            const orderBlock = document.getElementById('newOrder');
-
-            if (isOnline) {
-                statusText.innerText = 'В сети'; statusText.style.color = 'green';
-                toggleBtn.innerText = 'Уйти с линии'; toggleBtn.style.background = '#f44336';
-                setTimeout(() => { 
-                    // Имитируем прилет реального комментария
-                    document.getElementById('orderComment').innerText = "Подъехать к магазину 'Аян', нужен пустой багажник.";
-                    orderBlock.style.display = 'block'; 
-                }, 2000);
-            } else {
-                statusText.innerText = 'Офлайн'; statusText.style.color = 'red';
-                toggleBtn.innerText = 'Выйти на линию'; toggleBtn.style.background = '#4caf50';
-                orderBlock.style.display = 'none';
-                resetWaiting();
-            }
+            document.getElementById('status').innerText = isOnline ? 'В сети' : 'Офлайн';
+            document.getElementById('status').style.color = isOnline ? 'green' : 'red';
+            document.getElementById('toggleStatus').innerText = isOnline ? 'Уйти с линии' : 'Выйти на линию';
+            document.getElementById('toggleStatus').style.background = isOnline ? '#f44336' : '#4caf50';
         });
 
-        document.getElementById('acceptBtn').addEventListener('click', () => {
-            if(document.getElementById('acceptBtn').innerText.includes("Принять")) {
-                document.getElementById('acceptBtn').innerText = "🏁 Завершить поездку";
-                document.getElementById('acceptBtn').style.background = "#e91e63";
-                document.getElementById('waitBtn').style.display = "block";
-            } else {
-                clearInterval(waitInterval);
-                let finalPrice = basePrice;
-                if (totalWaitSeconds > 180) {
-                    const paidSeconds = totalWaitSeconds - 180;
-                    const paidMinutes = Math.ceil(paidSeconds / 60);
-                    finalPrice += (paidMinutes * 25);
-                }
-                
-                // Накручиваем баланс водителя
-                driverBalance += finalPrice;
-                document.getElementById('driverBalance').innerText = driverBalance;
-
-                alert(`Поездка завершена!\nИтого к оплате: ${finalPrice} ₸.\nСумма зачислена на баланс.`);
-                document.getElementById('newOrder').style.display = 'none';
-                resetWaiting();
+        document.getElementById('actionBtn').addEventListener('click', () => {
+            if (step === 0) {
+                // Принять
+                fetch('http://localhost:8080/api/order_action', {
+                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'accept' })
+                });
+                document.getElementById('actionBtn').innerText = "🚖 Я на месте";
+                document.getElementById('actionBtn').style.background = '#ff9800';
+                step = 1;
+            } else if (step === 1) {
+                // На месте
+                fetch('http://localhost:8080/api/order_action', {
+                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'arrived' })
+                });
+                document.getElementById('actionBtn').innerText = "🏁 Завершить поездку";
+                document.getElementById('actionBtn').style.background = '#e91e63';
+                step = 2;
+            } else if (step === 2) {
+                // Завершить
+                fetch('http://localhost:8080/api/order_action', {
+                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'complete' })
+                });
+                alert('Поездка внесена в систему!');
+                document.getElementById('orderCard').style.display = 'none';
+                currentOrderId = null; step = 0;
+                document.getElementById('actionBtn').innerText = "Принять заказ";
+                document.getElementById('actionBtn').style.background = '#2196f3';
             }
         });
-
-        document.getElementById('waitBtn').addEventListener('click', () => {
-            isWaiting = !isWaiting;
-            const waitBtn = document.getElementById('waitBtn');
-            const waitContainer = document.getElementById('waitContainer');
-
-            if (isWaiting) {
-                waitBtn.innerText = "🛑 Выключить ожидание";
-                waitBtn.style.background = "#f44336";
-                waitContainer.style.display = "block";
-
-                fetch('http://localhost:8080/api/driver', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ order_id: currentOrderId, action: 'arrived' })
-                }).catch(err => console.log("Тест уведомлений"));
-
-                waitInterval = setInterval(() => {
-                    totalWaitSeconds++;
-                    const container = document.getElementById('waitContainer');
-                    const typeText = document.getElementById('waitTypeText');
-                    const minutesText = document.getElementById('waitMinutes');
-                    const priceText = document.getElementById('orderPrice');
-
-                    if (totalWaitSeconds <= 180) {
-                        let timeLeft = 180 - totalWaitSeconds;
-                        let m = Math.floor(timeLeft / 60);
-                        let s = timeLeft % 60;
-                        s = s < 10 ? "0" + s : s;
-                        container.className = "waiting-status free-wait";
-                        typeText.innerText = "⏳ Бесплатное ожидание:";
-                        minutesText.innerText = `${m}:${s}`;
-                        priceText.innerText = basePrice;
-                    } else {
-                        let paidSeconds = totalWaitSeconds - 180;
-                        let m = Math.floor(paidSeconds / 60);
-                        let s = paidSeconds % 60;
-                        m = m < 10 ? "0" + m : m;
-                        s = s < 10 ? "0" + s : s;
-                        let paidMinutesRounded = Math.ceil(paidSeconds / 60);
-                        let currentWaitCost = paidMinutesRounded * 25;
-                        container.className = "waiting-status paid-wait";
-                        typeText.innerText = "⚠️ Платное ожидание:";
-                        minutesText.innerText = `${m}:${s} (+${currentWaitCost} ₸)`;
-                        priceText.innerText = basePrice + currentWaitCost;
-                    }
-                }, 1000); 
-            } else {
-                waitBtn.innerText = "⏱ Включить ожидание";
-                waitBtn.style.background = "#ff9800";
-                clearInterval(waitInterval);
-            }
-        });
-
-        function resetWaiting() {
-            clearInterval(waitInterval);
-            isWaiting = false;
-            totalWaitSeconds = 0;
-            document.getElementById('acceptBtn').innerText = "Принять заказ (20:00)";
-            document.getElementById('acceptBtn').style.background = "#2196f3";
-            document.getElementById('waitBtn').style.display = "none";
-            document.getElementById('waitContainer').style.display = "none";
-        }
     </script>
 </body>
 </html>
