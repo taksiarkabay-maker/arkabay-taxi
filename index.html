@@ -12,10 +12,10 @@
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: var(--tg-theme-secondary-bg-color, #f5f5f5); }
         .header img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
         .header h2 { margin: 8px 0 0 0; font-size: 18px; font-weight: bold; }
-        #map { height: 40vh; width: 100%; }
+        #map { height: 35vh; width: 100%; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
-        input, select { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; }
+        input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; }
         button { width: 100%; padding: 12px; background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
         .geo-btn { background: #ff9800; margin-bottom: 10px; padding: 8px; font-size: 13px; }
         .price-box { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 16px; border: 1px solid #ddd; }
@@ -37,8 +37,11 @@
         <div class="input-group">
             <input type="text" id="to" placeholder="Куда (Точка Б) — Кликните на карте">
         </div>
+        <!-- Новое поле для комментария -->
+        <div class="input-group">
+            <input type="text" id="comment" placeholder="Комментарий (например: нужен пустой багажник)">
+        </div>
         
-        <!-- Окно живого расчета цены -->
         <div class="price-box" id="priceDisplay">Стоимость: 400 ₸ (0 км)</div>
 
         <button id="orderBtn">Заказать такси</button>
@@ -48,18 +51,17 @@
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let latA = 43.3644, lngA = 77.1215; // По умолчанию Аркабай
-        let latB = null, lngB = null;       // Точка Б
+        let latA = 43.3644, lngA = 77.1215;
+        let latB = null, lngB = null;       
         let distanceKm = 0;
         let finalPrice = 400;
 
         const map = L.map('map').setView([latA, lngA], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-        let markerA = L.marker([latA, lngA], {draggable: true, title: "Точка А"}).addTo(map).bindPopup('Откуда (Точка А)').openPopup();
+        let markerA = L.marker([latA, lngA], {draggable: true}).addTo(map).bindPopup('Откуда (Точка А)').openPopup();
         let markerB = null;
 
-        // Расчет расстояния на клиенте
         function haversineDistance(l1, ln1, l2, ln2) {
             const R = 6371;
             const dLat = (l2 - l1) * Math.PI / 180;
@@ -79,7 +81,6 @@
             }
         }
 
-        // Клик по карте ставит Точку Б
         map.on('click', function(e) {
             latB = e.latlng.lat;
             lngB = e.latlng.lng;
@@ -104,7 +105,6 @@
             updatePrice();
         });
 
-        // Авто-геолокация
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition((position) => {
@@ -121,6 +121,7 @@
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
+            const commentText = document.getElementById('comment').value;
 
             if (!fromText || !latB) {
                 alert('Пожалуйста, выберите точку А и точку Б на карте!');
@@ -133,7 +134,8 @@
                 distance: distanceKm,
                 price: finalPrice,
                 lat: latA,
-                lng: lngA
+                lng: lngA,
+                comment: commentText // Передаем текст комментария
             };
 
             tg.sendData(JSON.stringify(orderData));
