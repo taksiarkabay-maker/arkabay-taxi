@@ -4,9 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси</title>
+    <!-- Подключаем Telegram Web App и API Яндекс Карт -->
     <script src="https://telegram.org"></script>
-    <link rel="stylesheet" href="https://unpkg.com" />
-    <script src="https://unpkg.com"></script>
+    <script src="https://yandex.ru" type="text/javascript"></script>
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: var(--tg-theme-secondary-bg-color, #f5f5f5); }
@@ -14,12 +14,12 @@
         #map { height: 35vh; width: 100%; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
-        .hint-text { font-size: 12px; color: #ff9800; font-weight: bold; margin: -5px 0 10px 2px; display: block; }
+        .hint-text { font-size: 11px; color: #ff9800; font-weight: bold; margin: -5px 0 10px 2px; display: block; line-height: 1.3; }
         input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; background: var(--tg-theme-bg-color, #fff); color: var(--tg-theme-text-color, #000); }
         input:focus { border-color: var(--tg-theme-button-color, #2481cc); outline: none; }
         button { width: 100%; padding: 12px; background: var(--tg-theme-button-color, #2481cc); color: var(--tg-theme-button-text-color, #fff); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; }
         .geo-btn { background: #ff9800; margin-bottom: 8px; padding: 10px; font-size: 14px; }
-        .price-box { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 16px; border: 1px solid #ddd; }
+        .price-box { background: var(--tg-theme-secondary-bg-color, #f5f5f5); padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 16px; border: 1px solid #ddd; color: #2481cc; }
         .loading-input { background: #fff3e0 !important; color: #e65100 !important; font-style: italic; }
     </style>
 </head>
@@ -28,21 +28,22 @@
         <img src="logo.png" alt="Taxi Logo">
         <h2>Заказ Такси Аркабай - Панфилово</h2>
     </div>
+    
+    <!-- Сюда загрузится Яндекс Карта -->
     <div id="map"></div>
+    
     <div class="container">
-        <!-- Кнопка автоопределения GPS -->
         <button id="geoBtn" class="geo-btn">📍 Автоматически определить где я</button>
-        <!-- Текстовое уведомление для пассажира -->
-        <span class="hint-text">💡 Укажите геометку на карте или введите адрес вручную (дождитесь, пока геометка прогрузится)</span>
+        <span class="hint-text">💡 Укажите геометку на карте (она определит точный адрес автоматически) или введите названия поселков вручную.</span>
         
         <div class="input-group">
-            <input type="text" id="from" placeholder="Откуда (Точка А или адрес вручную)">
+            <input type="text" id="from" placeholder="Откуда (Точка А)">
         </div>
         <div class="input-group">
-            <input type="text" id="to" placeholder="Куда (Точка Б или адрес вручную)">
+            <input type="text" id="to" placeholder="Куда (Кликните на карте или введите адрес)">
         </div>
         <div class="input-group">
-            <input type="text" id="comment" placeholder="Комментарий к заказу (например: у магазина)">
+            <input type="text" id="comment" placeholder="Комментарий к заказу">
         </div>
         <div class="input-group">
             <select id="paymentMethod">
@@ -50,143 +51,181 @@
                 <option value="Kaspi">📱 Kaspi перевод</option>
             </select>
         </div>
-        <div class="price-box" id="priceDisplay">Стоимость: 400 ₸ (Укажите маршрут)</div>
+        <div class="price-box" id="priceDisplay">Стоимость: 400 ₸</div>
         <button id="orderBtn">Заказать такси</button>
     </div>
 
-    <script>
+    <script type="text/javascript">
         const tg = window.Telegram.WebApp;
         tg.expand();
 
-        let latA = 43.3644, lngA = 77.1215; // По умолчанию центр рабочей зоны
-        let latB = null, lngB = null;       
+        let myMap;
+        let markerA, markerB;
+        let latA = 43.3644, lngA = 77.1215; // Центр зоны Аркабай-Панфилово
+        let latB, lngB;
         let distanceKm = 0, finalPrice = 400;
-        let tariffs = { base_price: 400, per_km_price: 80 };
+        let isManualMode = false;
 
-        // Запрашиваем живые тарифы у сервера
-        fetch('http://localhost:8080/api/get_tariffs')
-            .then(r => r.json())
-            .then(data => { tariffs = data; updatePrice(); })
-            .catch(() => { updatePrice(); });
+        // Ждем загрузки API Яндекс Карт
+        ymaps.ready(init);
 
-        const map = L.map('map').setView([latA, lngA], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
-        
-        let markerA = L.marker([latA, lngA], {draggable: true}).addTo(map).bindPopup('Точка А');
-        let markerB = null;
+        function init() {
+            myMap = new ymaps.Map("map", {
+                center: [latA, lngA], // Координаты центра карты
+                zoom: 13,
+                controls: ['zoomControl', 'geolocationControl']
+            });
 
-        function haversineDistance(l1, ln1, l2, ln2) {
-            const R = 6371;
-            const dLat = (l2 - l1) * Math.PI / 180;
-            const dLon = (ln2 - ln1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(l1 * Math.PI / 180) * Math.cos(l2 * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+            // Создаем перемещаемую Точку А
+            markerA = new ymaps.Placemark([latA, lngA], {
+                balloonContent: 'Точка А (Откуда)'
+            }, {
+                preset: 'islands#blueTaxiIcon',
+                draggable: true
+            });
+
+            myMap.geoObjects.add(markerA);
+
+            // Следим за ручным перетаскиванием Точки А
+            markerA.events.add('dragend', function () {
+                const coords = markerA.geometry.getCoordinates();
+                latA = coords[0]; lngA = coords[1];
+                isManualMode = false;
+                geocodeAddress(coords, 'from');
+            });
+
+            // Клик по карте ставит Точку Б
+            myMap.events.add('click', function (e) {
+                const coords = e.get('coords');
+                latB = coords[0]; lngB = coords[1];
+                isManualMode = false;
+
+                if (markerB) {
+                    markerB.geometry.setCoordinates(coords);
+                } else {
+                    markerB = new ymaps.Placemark(coords, {
+                        balloonContent: 'Точка Б (Куда)'
+                    }, {
+                        preset: 'islands#redHomeIcon',
+                        draggable: true
+                    });
+                    myMap.geoObjects.add(markerB);
+
+                    // Следим за перетаскиванием Точки Б
+                    markerB.events.add('dragend', function () {
+                        const bCoords = markerB.geometry.getCoordinates();
+                        latB = bCoords[0]; lngB = bCoords[1];
+                        geocodeAddress(bCoords, 'to');
+                    });
+                }
+                geocodeAddress(coords, 'to');
+            });
+            
+            // Первично определяем адрес Точки А при загрузке
+            geocodeAddress([latA, lngA], 'from');
         }
 
-        function updatePrice() {
-            if (latA && latB) {
-                distanceKm = haversineDistance(latA, lngA, latB, lngB);
-                finalPrice = Math.round(tariffs.base_price + (distanceKm * tariffs.per_km_price));
-                document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
-            } else {
-                document.getElementById('priceDisplay').innerText = `Стоимость: ${tariffs.base_price} ₸`;
-            }
-        }
-
-        // Поиск текстового адреса по координатам (OpenStreetMap Reverse Geocoding)
-        function fetchAddress(lat, lng, inputId) {
+        // Функция Распознавания Адреса по координатам (Обратное геокодирование)
+        function geocodeAddress(coords, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.classList.add('loading-input');
-            inputField.value = "⏳ Прогрузка геометки...";
+            inputField.value = "⏳ Распознаем адрес...";
 
-            fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
-                .then(r => r.json())
-                .then(data => {
-                    inputField.classList.remove('loading-input');
-                    if (data.address) {
-                        const road = data.address.road || "";
-                        const house = data.address.house_number || "";
-                        const village = data.address.village || data.address.suburb || "";
-                        inputField.value = `${village} ${road} ${house}`.trim() || "Точка на карте";
-                    } else {
-                        inputField.value = `Координаты: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                    }
-                }).catch(() => {
-                    inputField.classList.remove('loading-input');
-                    inputField.value = `Координаты: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                });
+            ymaps.geocode(coords).then(function (res) {
+                inputField.classList.remove('loading-input');
+                // Берем самый точный найденный объект адреса
+                const firstGeoObject = res.geoObjects.get(0);
+                if (firstGeoObject) {
+                    // Получаем понятную строку адреса (Улица, дом или поселок)
+                    inputField.value = firstGeoObject.getAddressLine();
+                    calculateRoutePrice();
+                } else {
+                    inputField.value = `Координаты: ${coords[0].toFixed(4)}, ${coords[1].toFixed(4)}`;
+                    calculateRoutePrice();
+                }
+            }).catch(() => {
+                inputField.classList.remove('loading-input');
+                inputField.value = `Геометка прогружена`;
+                calculateRoutePrice();
+            });
         }
 
-        // Выбор Точки Б кликом по карте
-        map.on('click', function(e) {
-            latB = e.latlng.lat; lngB = e.latlng.lng;
-            if (markerB) {
-                markerB.setLatLng(e.latlng);
-            } else {
-                markerB = L.marker([latB, lngB], {draggable: true}).addTo(map).bindPopup('Точка Б');
-                markerB.on('dragend', function() {
-                    latB = markerB.getLatLng().lat; lngB = markerB.getLatLng().lng;
-                    fetchAddress(latB, lngB, 'to');
-                    updatePrice();
-                });
-            }
-            fetchAddress(latB, lngB, 'to');
-            updatePrice();
-        });
+        // Функция Текстового анализа Зон для ручного ввода
+        function getZone(addressText) {
+            const txt = addressText.toLowerCase();
+            if (txt.includes('аркабай') || txt.includes('аркабаи')) return 'arkabay';
+            if (txt.includes('панфилово') || txt.includes('панфилов')) return 'panfilovo';
+            if (txt.includes('талгар')) return 'talgar';
+            if (txt.includes('алматы') || txt.includes('алмата') || txt.includes('город')) return 'almaty';
+            return 'unknown';
+        }
 
-        // Перетаскивание Точки А мышкой/пальцем
-        markerA.on('dragend', function() {
-            latA = markerA.getLatLng().lat; lngA = markerA.getLatLng().lng;
-            fetchAddress(latA, lngA, 'from');
-            updatePrice();
-        });
-
-        // Кнопка авто-GPS позиционирования пассажира
-        document.getElementById('geoBtn').addEventListener('click', () => {
-            if (navigator.geolocation) {
-                document.getElementById('from').classList.add('loading-input');
-                document.getElementById('from').value = "⏳ Поиск спутников GPS...";
-                
-                navigator.geolocation.getCurrentPosition((position) => {
-                    latA = position.coords.latitude;
-                    lngA = position.coords.longitude;
-                    map.setView([latA, lngA], 16);
-                    markerA.setLatLng([latA, lngA]);
-                    fetchAddress(latA, lngA, 'from');
-                    updatePrice();
-                }, () => {
-                    document.getElementById('from').classList.remove('loading-input');
-                    document.getElementById('from').value = "";
-                    alert('Не удалось определить геопозицию автоматически. Пожалуйста, введите адрес в поле вручную.');
-                });
-            }
-        });
-
-        // Логика ручного изменения адресов (если пользователь стер текст и пишет сам)
-        document.getElementById('from').addEventListener('change', () => updatePrice());
-        document.getElementById('to').addEventListener('change', () => updatePrice());
-
-        document.getElementById('orderBtn').addEventListener('click', () => {
+        // Калькулятор расчета стоимости (зоны или километраж Яндекса)
+        function calculateRoutePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
 
-            if (!fromVal || !toVal) {
-                alert('Пожалуйста, заполните поля адреса А и Б (вручную или через карту)!');
-                return;
-            }
+            if (isManualMode && fromVal && toVal) {
+                // Если пассажир ввел зоны вручную текстом
+                const zoneA = getZone(fromVal);
+                const zoneB = getZone(toVal);
 
-            // Отправляем финальный пакет данных в бота
-            tg.sendData(JSON.stringify({
-                from: fromVal,
-                to: toVal,
-                distance: distanceKm || 1.0, // Если ввели вручную без карты, даем базовый 1 км
-                price: finalPrice,
-                lat: latA, lng: lngA,
-                comment: document.getElementById('comment').value,
-                payment: document.getElementById('paymentMethod').value
-            }));
-            tg.close();
-        });
-    </script>
-</body>
-</html>
+                if (zoneA === 'unknown' || zoneB === 'unknown') {
+                    finalPrice = 400;
+                    document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
+                    return;
+                }
+
+                if (zoneA === zoneB) { finalPrice = 500; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (Внутри поселка)`; }
+                else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (Межпоселковый)`; }
+                else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (До Талгара)`; }
+                else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (До города)`; }
+            } else {
+                // Если точки стоят на карте — считаем честное расстояние Яндекса
+                if (latA && latB) {
+                    // Используем встроенную математическую функцию Яндекса для измерения расстояния по координатам
+                    distanceKm = ymaps.coordSystem.geo.getDistance([latA, lngA], [latB, lngB]) / 1000;
+                    finalPrice = Math.round(400 + (distanceKm * 80));
+                    document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
+                }
+            }
+        }
+
+        // Логика автоматического определения GPS позиции смартфона
+        document.getElementById('geoBtn').addEventListener('click', () => {
+            if (navigator.geolocation) {document.getElementById('from').value = "⏳ Опрашиваем GPS устройства...";
+navigator.geolocation.getCurrentPosition((position) => {
+latA = position.coords.latitude;
+lngA = position.coords.longitude;
+isManualMode = false;
+if (myMap && markerA) {
+myMap.setCenter([latA, lngA], 16);
+markerA.geometry.setCoordinates([latA, lngA]);
+geocodeAddress([latA, lngA], 'from');
+}
+}, () => {
+alert('Доступ к GPS заблокирован. Введите адрес буквами.');
+});
+}
+});
+// Переключение в ручной текстовый режим при вводе букв с клавиатуры
+document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculateRoutePrice(); });
+document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculateRoutePrice(); });
+document.getElementById('orderBtn').addEventListener('click', () => {
+const fromVal = document.getElementById('from').value;
+const toVal = document.getElementById('to').value;
+if (!fromVal || !toVal) {
+alert('Укажите начальный и конечный адреса поездки!');
+return;
+}
+tg.sendData(JSON.stringify({
+from: fromVal,
+to: toVal,
+distance: distanceKm || 1.0,
+price: finalPrice,
+lat: latA, lng: lngA,
+comment: document.getElementById('comment').value,
+payment: document.getElementById('paymentMethod').value
+}));
+tg.close();
+});
