@@ -3,218 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админ-Панель Такси</title>
+    <title>Админ-Панель</title>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f6f9;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-        }
-        h2 {
-            text-align: center;
-            color: #111;
-            margin-top: 0;
-        }
-        .card {
-            background: #f8f9fa;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .revenue-title {
-            font-size: 14px;
-            color: #6c757d;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        .revenue-val {
-            font-size: 28px;
-            font-weight: bold;
-            color: #28a745;
-            margin: 5px 0 0 0;
-        }
-        .form-group {
-            margin-bottom: 15px;
-        }
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        input[type="number"] {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 6px;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-        button {
-            width: 100%;
-            padding: 12px;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        .links-section {
-            background: #e9ecef;
-            border-radius: 8px;
-            padding: 15px;
-            margin-top: 25px;
-        }
-        .links-section h4 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #495057;
-        }
-        .link-block {
-            margin-bottom: 10px;
-            font-size: 13px;
-        }
-        .link-block strong {
-            display: block;
-            color: #495057;
-            margin-bottom: 2px;
-        }
-        .url-text {
-            background: #fff;
-            padding: 6px 10px;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            word-break: break-all;
-            display: block;
-            user-select: all;
-            color: #007bff;
-        }
+        body { font-family: Arial, sans-serif; background: #f4f6f9; padding: 20px; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .card { background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; margin-bottom: 20px; border: 1px solid #eee; }
+        .rev { font-size: 28px; font-weight: bold; color: #28a745; }
+        input { width: 100%; padding: 10px; margin: 5px 0 15px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #007bff; color: #fff; border: none; border-radius: 6px; font-weight: bold; cursor: pointer; }
+        .url { background: #eee; padding: 6px; border-radius: 4px; font-size: 12px; word-break: break-all; display: block; margin-top: 5px; color: #007bff; }
     </style>
 </head>
 <body>
-
 <div class="container">
-    <h2>🎛 Управление Такси Аркабай-Панфилово</h2>
+    <h2>🎛 Управление Такси</h2>
+    <div class="card"><div>📈 Общая выручка:</div><div class="rev" id="revenue">0 ₸</div></div>
+    <h4>🔧 Настройка тарифов</h4>
+    <label>Подача машины (₸):</label><input type="number" id="base_price">
+    <label>Цена за 1 км (₸):</label><input type="number" id="per_km_price">
+    <button onclick="save()">Сохранить тарифы</button>
 
-    <!-- Блок выручки -->
-    <div class="card">
-        <div class="revenue-title">📈 Общая выручка сервиса:</div>
-        <div class="revenue-val" id="revenue">0 ₸</div>
-    </div>
-
-    <!-- Блок настройки тарифов -->
-    <div class="form-section">
-        <h4>🔧 Настройка тарифов</h4>
-        <div class="form-group">
-            <label for="base_price">Подача машины (₸):</label>
-            <input type="number" id="base_price" value="400">
-        </div>
-        <div class="form-group">
-            <label for="per_km_price">Цена за 1 км (₸):</label>
-            <input type="number" id="per_km_price" value="80">
-        </div>
-        <button onclick="saveTariffs()">Сохранить тарифы</button>
-    </div>
-
-    <!-- Блок реальных ссылок -->
-    <div class="links-section">
-        <h4>🔗 Ссылки на экраны вашего проекта для BotFather и Кода:</h4>
-        
-        <div class="link-block">
-            <strong>Пассажир (CLIENT_APP_URL):</strong>
-            <span class="url-text" id="client_url">Загрузка...</span>
-        </div>
-        
-        <div class="link-block">
-            <strong>Водитель (DRIVER_APP_URL):</strong>
-            <span class="url-text" id="driver_url">Загрузка...</span>
-        </div>
-        
-        <div class="link-block">
-            <strong>Админ (ADMIN_APP_URL):</strong>
-            <span class="url-text" id="admin_url">Загрузка...</span>
-        </div>
+    <div style="background:#e9ecef; padding:15px; border-radius:8px; margin-top:20px;">
+        <h4>🔗 Ссылки для BotFather:</h4>
+        <b>Клиент:</b> <span class="url" id="client_url"></span>
+        <b>Водитель:</b> <span class="url" id="driver_url"></span>
+        <b>Админ:</b> <span class="url" id="admin_url"></span>
     </div>
 </div>
 
 <script>
-   // Адрес вашего запущенного бэкенда бота
     const API_URL = 'http://localhost:8080';
-
-    // Функция автоматической загрузки данных при открытии панели
-    async function loadAdminStats() {
+    async function load() {
         try {
-            const response = await fetch(`${API_URL}/api/admin_stats`);
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Выводим статистику и тарифы
-                document.getElementById('revenue').innerText = `${data.revenue} ₸`;
-                document.getElementById('base_price').value = data.base_price;
-                document.getElementById('per_km_price').value = data.per_km_price;
-                
-                // Наполняем блоки правильными ссылками от бота
-                document.getElementById('client_url').innerText = data.client_url;
-                document.getElementById('driver_url').innerText = data.driver_url;
-                document.getElementById('admin_url').innerText = data.admin_url;
-            } else {
-                console.error('Ошибка получения данных от API');
+            let r = await fetch(`${API_URL}/api/admin_stats`);
+            if (r.ok) {
+                let d = await r.json();
+                document.getElementById('revenue').innerText = `${d.revenue} ₸`;
+                document.getElementById('base_price').value = d.base_price;
+                document.getElementById('per_km_price').value = d.per_km_price;
+                document.getElementById('client_url').innerText = d.client_url;
+                document.getElementById('driver_url').innerText = d.driver_url;
+                document.getElementById('admin_url').innerText = d.admin_url;
             }
-        } catch (error) {
-            console.error('Не удалось связаться с сервером:', error);
-        }
+        } catch(e) {}
     }
-
-    // Функция сохранения измененных тарифов в базу данных taxi.db
-    async function saveTariffs() {
-        const basePrice = document.getElementById('base_price').value;
-        const perKmPrice = document.getElementById('per_km_price').value;
-
+    async function save() {
         try {
-            const response = await fetch(`${API_URL}/api/update_tariffs`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    base_price: basePrice,
-                    per_km_price: perKmPrice
-                })
-            });
-
-            if (response.ok) {
-                alert('🎯 Тарифы успешно сохранены и обновлены в базе!');
-                loadAdminStats(); // Перезагружаем данные для проверки
-            } else {
-                alert('Ошибка при сохранении тарифов.');
-            }
-        } catch (error) {
-            alert('Нет связи с сервером бота!');
-            console.error(error);
-        }
+            let r = await fetch(`${API_URL}/api/update_tariffs`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base_price: document.getElementById('base_price').value, per_km_price: document.getElementById('per_km_price').value }) });
+            if (r.ok) { alert("Сохранено!"); load(); }
+        } catch(e) {}
     }
-
-    // Запускаем сбор данных сразу при загрузке страницы
-    window.onload = loadAdminStats;
+    window.onload = load;
 </script>
-
 </body>
 </html>
