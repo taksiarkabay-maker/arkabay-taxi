@@ -4,95 +4,266 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель Водителя</title>
-    <!-- Внутренний скрипт Telegram без пробелов -->
+    <!-- Подключаем Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     <style>
-        body { font-family: Arial, sans-serif; padding: 15px; background: var(--tg-theme-bg-color, #f5f5f5); color: var(--tg-theme-text-color, #000); }
-        .card { background: #fff; padding: 15px; border-radius: 12px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 15px; }
-        .finance { background: #e8f5e9; color: #2e7d32; text-align: center; font-size: 18px; font-weight: bold; }
-        .order { background: #e3f2fd; border-left: 5px solid #2196f3; display: none; }
-        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
-        .btn-go { background: #4caf50; color: white; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+            margin: 0;
+            padding: 15px;
+        }
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .balance-box {
+            background: #e2f0d9;
+            border: 1px solid #a9d08e;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: #385723;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .status-box {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .status-text {
+            font-weight: bold;
+            color: #dc3545;
+        }
+        .status-text.online {
+            color: #28a745;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-status {
+            background-color: #007bff;
+            color: white;
+        }
+        .btn-status.online {
+            background-color: #6c757d;
+        }
+        .orders-section {
+            margin-top: 25px;
+        }
+        .orders-section h4 {
+            border-bottom: 2px solid #dee2e6;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+            color: #495057;
+        }
+        .order-card {
+            background: #fff;
+            border: 2px solid #ffc107;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+        }
+        .order-card h5 {
+            margin: 0 0 10px 0;
+            color: #d39e00;
+            font-size: 15px;
+            text-transform: uppercase;
+        }
+        .order-info {
+            font-size: 14px;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        .order-info strong {
+            color: #495057;
+        }
+        .btn-accept {
+            background-color: #28a745;
+            color: white;
+            margin-top: 10px;
+        }
+        .btn-accept:hover {
+            background-color: #218838;
+        }
+        .no-orders {
+            text-align: center;
+            color: #6c757d;
+            font-style: italic;
+            padding: 20px 0;
+        }
     </style>
 </head>
 <body>
-    <div class="card finance">💰 Баланс: <span id="balance">0</span> ₸</div>
-    <div class="card" style="text-align:center;">
-        <h3>Статус: <span id="status" style="color:red;">Офлайн</span></h3>
-        <button id="toggleStatus" class="btn btn-go">Выйти на линию</button>
+
+<div class="container">
+    <div class="header">
+        <h2>Панель Водителя</h2>
     </div>
 
-    <div id="orderCard" class="card order">
-        <h4>⚡ НОВЫЙ ЗАКАЗ В СИСТЕМЕ!</h4>
-        <p><strong>Откуда:</strong> <span id="oFrom"></span></p>
-        <p><strong>Куда:</strong> <span id="oTo"></span></p>
-        <p><strong>Оплата:</strong> <span id="oPay" style="color:blue;font-weight:bold;"></span></p>
-        <p><strong>Комментарий:</strong> <span id="oComm"></span></p>
-        <p><strong>Сумма:</strong> <span id="oPrice"></span> ₸</p>
-        <button id="actionBtn" class="btn btn-go" style="background:#2196f3;">Принять заказ</button>
+    <!-- Баланс водителя -->
+    <div class="balance-box">
+        💰 Баланс: <span id="balance">0</span> ₸
     </div>
 
-    <script>
+    <!-- Статус линии -->
+    <div class="status-box">
+        <h3>Статус: <span id="statusText" class="status-text">Офлайн</span></h3>
+        <button id="statusBtn" class="btn btn-status" onclick="toggleStatus()">Выйти на линию</button>
+    </div>
+
+    <!-- Секция активных заказов -->
+    <div class="orders-section">
+        <h4>⚡ АКТИВНЫЕ ЗАКАЗЫ В СИСТЕМЕ:</h4>
+        <div id="ordersList">
+            <div class="no-orders">Для просмотра заказов выйдите на линию...</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_URL = 'http://localhost:8080';
+    let isOnline = false;
+    let driverId = 0;
+    let updateInterval = null;
+
+    // Инициализация Telegram WebApp, чтобы узнать ID водителя
+    if (window.Telegram && window.Telegram.WebApp) {
         const tg = window.Telegram.WebApp;
-        let isOnline = false, currentOrderId = null, step = 0;
-        let drId = tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : 999;
-        const BACKEND_URL = 'http://localhost:8080'; // При использовании ngrok замените на адрес ngrok
+        tg.expand();
+        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+            driverId = tg.initDataUnsafe.user.id;
+        }
+    }
 
-        setInterval(() => {
-            if(!isOnline) return;
-            fetch(`${BACKEND_URL}/api/driver_status?driver_id=${drId}`)
-                .then(r => r.json()).then(d => { document.getElementById('balance').innerText = d.balance; });
+    // Для локальных тестов в браузере, если Telegram ID равен 0
+    if (driverId === 0) {
+        driverId = 99999; // Временный тестовый ID
+    }
+
+    // Загрузка баланса водителя с бэкенда
+    async function loadDriverStatus() {
+        try {
+            const response = await fetch(`${API_URL}/api/driver_status?driver_id=${driverId}`);
+            if (response.ok) {
+                const data = await response.json();
+                document.getElementById('balance').innerText = data.balance;
+            }
+        } catch (error) {
+            console.error('Ошибка загрузки статуса водителя:', error);
+        }
+    }
+
+    // Переключение режима Офлайн / Онлайн
+    function toggleStatus() {
+        isOnline = !isOnline;
+        const statusText = document.getElementById('statusText');
+        const statusBtn = document.getElementById('statusBtn');
+
+        if (isOnline) {
+            statusText.innerText = 'Онлайн';
+            statusText.className = 'status-text online';
+            statusBtn.innerText = 'Уйти с линии';
+            statusBtn.className = 'btn btn-status online';
             
-            if(!currentOrderId) {
-                fetch(`${BACKEND_URL}/api/get_active_orders`)
-                    .then(r => r.json()).then(orders => {
-                        if(orders.length > 0) {
-                            let o = orders[0]; currentOrderId = o.id;
-                            document.getElementById('oFrom').innerText = o.from_address;
-                            document.getElementById('oTo').innerText = o.to_address;
-                            document.getElementById('oPay').innerText = o.payment_method;
-                            document.getElementById('oComm').innerText = o.comment;
-                            document.getElementById('oPrice').innerText = o.price;
-                            document.getElementById('orderCard').style.display = 'block';
-                        }
-                    });
-            }
-        }, 3000);
+            // Включаем ежесекундный опрос заказов
+            loadActiveOrders();
+            updateInterval = setInterval(loadActiveOrders, 5000);
+        } else {
+            statusText.innerText = 'Офлайн';
+            statusText.className = 'status-text';
+            statusBtn.innerText = 'Выйти на линию';
+            statusBtn.className = 'btn btn-status';
+            
+            // Выключаем опрос
+            clearInterval(updateInterval);
+            document.getElementById('ordersList').innerHTML = '<div class="no-orders">Для просмотра заказов выйдите на линию...</div>';
+        }
+    }
 
-        document.getElementById('toggleStatus').addEventListener('click', () => {
-            isOnline = !isOnline;
-            document.getElementById('status').innerText = isOnline ? 'В сети' : 'Офлайн';
-            document.getElementById('status').style.color = isOnline ? 'green' : 'red';
-            document.getElementById('toggleStatus').innerText = isOnline ? 'Уйти с линии' : 'Выйти на линию';
-            document.getElementById('toggleStatus').style.background = isOnline ? '#f44336' : '#4caf50';
-        });
-
-        document.getElementById('actionBtn').addEventListener('click', () => {
-            if (step === 0) {
-                fetch(`${BACKEND_URL}/api/order_action`, {
-                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'accept' })
+    // Загрузка списка доступных заказов из базы taxi.db
+    async function loadActiveOrders() {
+        if (!isOnline) return;
+        
+        try {
+            const response = await fetch(`${API_URL}/api/get_active_orders`);
+            if (response.ok) {
+                const orders = await response.json();
+                const listContainer = document.getElementById('ordersList');
+                
+                if (orders.length === 0) {
+                    listContainer.innerHTML = '<div class="no-orders">Пока нет активных заказов. Ожидайте...</div>';
+                    return;
+                }
+                
+                let html = '';
+                orders.forEach(order => {
+                    html += `
+                        <div class="order-card">
+                            <h5>⚡ НОВЫЙ ЗАКАЗ №${order.id}!</h5>
+                            <div class="order-info">📍 <strong>Откуда:</strong> ${order.from_address}</div>
+                            <div class="order-info">🏁 <strong>Куда:</strong> ${order.to_address}</div>
+                            <div class="order-info">💵 <strong>Оплата:</strong> ${order.payment_method}</div>
+                            <div class="order-info">💡 <strong>Комментарий:</strong> ${order.comment}</div>
+                            <div class="order-info">💰 <strong>Сумма:</strong> ${order.price} ₸</div>
+                            <button class="btn btn-accept" onclick="acceptOrder(${order.id})">Принять заказ</button>
+                        </div>
+                    `;
                 });
-                document.getElementById('actionBtn').innerText = "🚖 Я на месте";
-                document.getElementById('actionBtn').style.background = '#ff9800';
-                step = 1;
-            } else if (step === 1) {
-                fetch(`${BACKEND_URL}/api/order_action`, {
-                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'arrived' })
-                });
-                document.getElementById('actionBtn').innerText = "🏁 Завершить поездку";
-                document.getElementById('actionBtn').style.background = '#e91e63';
-                step = 2;
-            } else if (step === 2) {
-                fetch(`${BACKEND_URL}/api/order_action`, {
-                    method: 'POST', body: JSON.stringify({ order_id: currentOrderId, driver_id: drId, action: 'complete' })
-                });
-                alert('Поездка успешно завершена!');
-                document.getElementById('orderCard').style.display = 'none';
-                currentOrderId = null; step = 0;
-                document.getElementById('actionBtn').innerText = "Принять заказ";
-                document.getElementById('actionBtn').style.background = '#2196f3';
+                listContainer.innerHTML = html;
             }
-        });
-    </script>
+        } catch (error) {
+            console.error('Ошибка получения заказов:', error);
+        }
+    }
+
+    // Действие при нажатии кнопки «Принять заказ»
+    async function acceptOrder(orderId) {
+        try {
+            const response = await fetch(`${API_URL}/api/order_action`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    order_id: orderId,
+                    driver_id: driverId,
+                    action: 'accept'
+                })
+            });
+
+            if (response.ok) {
+                alert(`🚀 Вы успешно приняли заказ №${orderId}! Пассажиру отправлено уведомление.`);
+                loadActiveOrders(); // Обновляем список
+                loadDriverStatus(); // Обновляем баланс
+            } else {
+                alert('Не удалось принять заказ. Возможно, его уже забрал другой водитель.');
+            }
+        } catch (error) {
+            alert('Нет связи с сервером такси!');
+            console.error(error);
+        }
+    }
+
+    // Загружаем начальный баланс при открытии страницы
+    window.onload = loadDriverStatus;
+</script>
+
 </body>
 </html>
