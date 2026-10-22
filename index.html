@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Заказ Такси 2ГИС</title>
+    <title>Заказ Такси</title>
     <!-- Подключаем Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     
-    <!-- Подключаем Leaflet CSS и JS для работы карты -->
+    <!-- Подключаем Leaflet CSS и JS для безотказной работы карты -->
     <link rel="stylesheet" href="https://unpkg.com" />
     <script src="https://unpkg.com"></script>
     
@@ -26,14 +26,14 @@
 </head>
 <body>
     <div class="header">
-        <h2>Заказ Такси Аркабай - Панфилово (2ГИС)</h2>
+        <h2>Заказ Такси Аркабай - Панфилово</h2>
     </div>
     
     <div id="map"></div>
     
     <div class="container">
         <button id="geoBtn" class="geo-btn">📍 Автоматически определить где я</button>
-        <span class="hint-text">💡 Кликните на карту 2ГИС для выбора точки Б или переместите маркер точки А.</span>
+        <span class="hint-text">💡 Кликните на карту для выбора точки Б или переместите маркер точки А.</span>
         
         <div class="input-group"><input type="text" id="from" placeholder="Откуда (Точка А)"></div>
         <div class="input-group"><input type="text" id="to" placeholder="Куда (Точка Б)"></div>
@@ -65,10 +65,10 @@
         // Инициализируем карту Leaflet
         myMap = L.map('map').setView([latA, lngA], 13);
         
-        // Подключаем рабочий слой тайлов 2ГИС
-        L.tileLayer('https://tile{s}://{x}&y={y}&z={z}', {
-            subdomains: ['0', '1', '2', '3'],
-            attribution: '© 2GIS'
+        // Подключаем стандартный и самый стабильный глобальный слой OpenStreetMap
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
         }).addTo(myMap);
 
         // Ставим маркер А
@@ -99,11 +99,11 @@
             geocodeAddress(latB, lngB, 'to');
         });
 
-        // Слушаем ручной ввод текста для пересчета цен по зонам
+        // Ручной ввод текста
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Рабочий бесплатный геокодер (обратное геокодирование)
+        // Рабочий бесплатный геокодер
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -156,20 +156,19 @@
                 else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (До города)`; }
             } else {
                 if (latA && latB) {
-                    const R = 6371; // Радиус Земли
+                    const R = 6371; 
                     const dLat = (latB - latA) * Math.PI / 180;
                     const dLon = (lngB - lngA) * Math.PI / 180;
                     const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
                     distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
                     
-                    // Подача 400 ₸ + 80 ₸ за каждый километр
                     finalPrice = Math.round(400 + (distanceKm * 80));
                     document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
                 }
             }
         }
 
-        // Кнопка автоматического определения GPS
+        // Автоматическое определение местоположения по GPS
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
@@ -187,13 +186,17 @@
             }
         });
 
-        // Отправка готового заказа обратно в Телеграм-бот
+        // Отправка заказа в бот
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
             const commentText = document.getElementById('comment').value || "Отсутствует";
             const paymentText = document.getElementById('paymentMethod').value;
-        if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) { 
+
+            if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) {
+                alert("Пожалуйста, укажите точки А и Б на карте или текстом!");
+
+if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) { 
             alert("Пожалуйста, укажите точки А и Б на карте или текстом!"); 
             return; 
         }
@@ -213,7 +216,6 @@
             tg.sendData(JSON.stringify(orderData)); 
             tg.close(); 
         } else { 
-            alert("Данные заказа (Локальный тест):\n" + JSON.stringify(orderData, null, 2)); 
+            alert("Данные заказа (локальный тест):\n" + JSON.stringify(orderData, null, 2)); 
         } 
     });
-
