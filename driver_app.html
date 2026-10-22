@@ -4,266 +4,80 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Панель Водителя</title>
-    <!-- Подключаем Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f8f9fa;
-            color: #212529;
-            margin: 0;
-            padding: 15px;
-        }
-        .container {
-            max-width: 500px;
-            margin: 0 auto;
-            background: #ffffff;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-        }
-        .header {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .balance-box {
-            background: #e2f0d9;
-            border: 1px solid #a9d08e;
-            padding: 12px;
-            border-radius: 8px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #385723;
-            margin-bottom: 15px;
-            text-align: center;
-        }
-        .status-box {
-            text-align: center;
-            margin-bottom: 20px;
-        }
-        .status-text {
-            font-weight: bold;
-            color: #dc3545;
-        }
-        .status-text.online {
-            color: #28a745;
-        }
-        .btn {
-            width: 100%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        .btn-status {
-            background-color: #007bff;
-            color: white;
-        }
-        .btn-status.online {
-            background-color: #6c757d;
-        }
-        .orders-section {
-            margin-top: 25px;
-        }
-        .orders-section h4 {
-            border-bottom: 2px solid #dee2e6;
-            padding-bottom: 5px;
-            margin-bottom: 15px;
-            color: #495057;
-        }
-        .order-card {
-            background: #fff;
-            border: 2px solid #ffc107;
-            border-radius: 10px;
-            padding: 15px;
-            margin-bottom: 15px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.03);
-        }
-        .order-card h5 {
-            margin: 0 0 10px 0;
-            color: #d39e00;
-            font-size: 15px;
-            text-transform: uppercase;
-        }
-        .order-info {
-            font-size: 14px;
-            margin-bottom: 8px;
-            line-height: 1.4;
-        }
-        .order-info strong {
-            color: #495057;
-        }
-        .btn-accept {
-            background-color: #28a745;
-            color: white;
-            margin-top: 10px;
-        }
-        .btn-accept:hover {
-            background-color: #218838;
-        }
-        .no-orders {
-            text-align: center;
-            color: #6c757d;
-            font-style: italic;
-            padding: 20px 0;
-        }
+        body { font-family: Arial, sans-serif; background: #f8f9fa; padding: 15px; margin: 0; }
+        .container { max-width: 500px; margin: 0 auto; background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .balance-box { background: #e2f0d9; padding: 12px; border-radius: 8px; font-size: 18px; font-weight: bold; text-align: center; color: #385723; margin-bottom: 15px; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+        .btn-status { background: #007bff; color: #fff; }
+        .btn-status.online { background: #6c757d; }
+        .order-card { border: 2px solid #ffc107; background: #fff; padding: 15px; border-radius: 10px; margin-top: 15px; }
+        .btn-accept { background: #28a745; color: #fff; margin-top: 10px; }
+        .no-orders { text-align: center; color: #6c757d; font-style: italic; padding: 20px 0; }
     </style>
 </head>
 <body>
-
 <div class="container">
-    <div class="header">
-        <h2>Панель Водителя</h2>
-    </div>
-
-    <!-- Баланс водителя -->
-    <div class="balance-box">
-        💰 Баланс: <span id="balance">0</span> ₸
-    </div>
-
-    <!-- Статус линии -->
-    <div class="status-box">
-        <h3>Статус: <span id="statusText" class="status-text">Офлайн</span></h3>
+    <h2>Панель Водителя</h2>
+    <div class="balance-box">💰 Баланс: <span id="balance">0</span> ₸</div>
+    <div style="text-align:center; margin-bottom:20px;">
+        <h3>Статус: <span id="statusText" style="color:red; font-weight:bold;">Офлайн</span></h3>
         <button id="statusBtn" class="btn btn-status" onclick="toggleStatus()">Выйти на линию</button>
     </div>
-
-    <!-- Секция активных заказов -->
-    <div class="orders-section">
-        <h4>⚡ АКТИВНЫЕ ЗАКАЗЫ В СИСТЕМЕ:</h4>
-        <div id="ordersList">
-            <div class="no-orders">Для просмотра заказов выйдите на линию...</div>
-        </div>
-    </div>
+    <h4>⚡ АКТИВНЫЕ ЗАКАЗЫ:</h4>
+    <div id="ordersList"><div class="no-orders">Для просмотра заказов выйдите на линию...</div></div>
 </div>
 
 <script>
     const API_URL = 'http://localhost:8080';
-    let isOnline = false;
-    let driverId = 0;
-    let updateInterval = null;
+    let isOnline = false, driverId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || 99999, interval = null;
 
-    // Инициализация Telegram WebApp, чтобы узнать ID водителя
-    if (window.Telegram && window.Telegram.WebApp) {
-        const tg = window.Telegram.WebApp;
-        tg.expand();
-        if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
-            driverId = tg.initDataUnsafe.user.id;
-        }
-    }
-
-    // Для локальных тестов в браузере, если Telegram ID равен 0
-    if (driverId === 0) {
-        driverId = 99999; // Временный тестовый ID
-    }
-
-    // Загрузка баланса водителя с бэкенда
-    async function loadDriverStatus() {
+    async function loadStatus() {
         try {
-            const response = await fetch(`${API_URL}/api/driver_status?driver_id=${driverId}`);
-            if (response.ok) {
-                const data = await response.json();
-                document.getElementById('balance').innerText = data.balance;
-            }
-        } catch (error) {
-            console.error('Ошибка загрузки статуса водителя:', error);
-        }
+            let r = await fetch(`${API_URL}/api/driver_status?driver_id=${driverId}`);
+            if (r.ok) { let d = await r.json(); document.getElementById('balance').innerText = d.balance; }
+        } catch(e) {}
     }
 
-    // Переключение режима Офлайн / Онлайн
     function toggleStatus() {
         isOnline = !isOnline;
-        const statusText = document.getElementById('statusText');
-        const statusBtn = document.getElementById('statusBtn');
-
+        let txt = document.getElementById('statusText'), btn = document.getElementById('statusBtn');
         if (isOnline) {
-            statusText.innerText = 'Онлайн';
-            statusText.className = 'status-text online';
-            statusBtn.innerText = 'Уйти с линии';
-            statusBtn.className = 'btn btn-status online';
-            
-            // Включаем ежесекундный опрос заказов
-            loadActiveOrders();
-            updateInterval = setInterval(loadActiveOrders, 5000);
+            txt.innerText = 'Онлайн'; txt.style.color = 'green'; btn.innerText = 'Уйти с линии'; btn.classList.add('online');
+            loadOrders(); interval = setInterval(loadOrders, 5000);
         } else {
-            statusText.innerText = 'Офлайн';
-            statusText.className = 'status-text';
-            statusBtn.innerText = 'Выйти на линию';
-            statusBtn.className = 'btn btn-status';
-            
-            // Выключаем опрос
-            clearInterval(updateInterval);
-            document.getElementById('ordersList').innerHTML = '<div class="no-orders">Для просмотра заказов выйдите на линию...</div>';
+            txt.innerText = 'Офлайн'; txt.style.color = 'red'; btn.innerText = 'Выйти на линию'; btn.classList.remove('online');
+            clearInterval(interval); document.getElementById('ordersList').innerHTML = '<div class="no-orders">Для просмотра заказов выйдите на линию...</div>';
         }
     }
 
-    // Загрузка списка доступных заказов из базы taxi.db
-    async function loadActiveOrders() {
+    async function loadOrders() {
         if (!isOnline) return;
-        
         try {
-            const response = await fetch(`${API_URL}/api/get_active_orders`);
-            if (response.ok) {
-                const orders = await response.json();
-                const listContainer = document.getElementById('ordersList');
-                
-                if (orders.length === 0) {
-                    listContainer.innerHTML = '<div class="no-orders">Пока нет активных заказов. Ожидайте...</div>';
-                    return;
-                }
-                
-                let html = '';
-                orders.forEach(order => {
-                    html += `
-                        <div class="order-card">
-                            <h5>⚡ НОВЫЙ ЗАКАЗ №${order.id}!</h5>
-                            <div class="order-info">📍 <strong>Откуда:</strong> ${order.from_address}</div>
-                            <div class="order-info">🏁 <strong>Куда:</strong> ${order.to_address}</div>
-                            <div class="order-info">💵 <strong>Оплата:</strong> ${order.payment_method}</div>
-                            <div class="order-info">💡 <strong>Комментарий:</strong> ${order.comment}</div>
-                            <div class="order-info">💰 <strong>Сумма:</strong> ${order.price} ₸</div>
-                            <button class="btn btn-accept" onclick="acceptOrder(${order.id})">Принять заказ</button>
-                        </div>
-                    `;
+            let r = await fetch(`${API_URL}/api/get_active_orders`);
+            if (r.ok) {
+                let orders = await r.json(), html = '';
+                if(orders.length === 0) { document.getElementById('ordersList').innerHTML = '<div class="no-orders">Активных заказов нет.</div>'; return; }
+                orders.forEach(o => {
+                    html += `<div class="order-card">
+                        <strong>№${o.id} | Сумма: ${o.price} ₸</strong><br>
+                        📍 Откуда: ${o.from_address}<br>🏁 Куда: ${o.to_address}<br>💵 Оплата: ${o.payment_method}<br>
+                        <button class="btn btn-accept" onclick="acceptOrder(${o.id})">Принять заказ</button>
+                    </div>`;
                 });
-                listContainer.innerHTML = html;
+                document.getElementById('ordersList').innerHTML = html;
             }
-        } catch (error) {
-            console.error('Ошибка получения заказов:', error);
-        }
+        } catch(e) {}
     }
 
-    // Действие при нажатии кнопки «Принять заказ»
-    async function acceptOrder(orderId) {
+    async function acceptOrder(id) {
         try {
-            const response = await fetch(`${API_URL}/api/order_action`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    order_id: orderId,
-                    driver_id: driverId,
-                    action: 'accept'
-                })
-            });
-
-            if (response.ok) {
-                alert(`🚀 Вы успешно приняли заказ №${orderId}! Пассажиру отправлено уведомление.`);
-                loadActiveOrders(); // Обновляем список
-                loadDriverStatus(); // Обновляем баланс
-            } else {
-                alert('Не удалось принять заказ. Возможно, его уже забрал другой водитель.');
-            }
-        } catch (error) {
-            alert('Нет связи с сервером такси!');
-            console.error(error);
-        }
+            let r = await fetch(`${API_URL}/api/order_action`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ order_id: id, driver_id: driverId, action: 'accept' }) });
+            if (r.ok) { alert("Заказ принят!"); loadOrders(); loadStatus(); }
+        } catch(e) {}
     }
-
-    // Загружаем начальный баланс при открытии страницы
-    window.onload = loadDriverStatus;
+    window.onload = loadStatus;
 </script>
-
 </body>
 </html>
