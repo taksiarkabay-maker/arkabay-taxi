@@ -156,7 +156,7 @@
 </div>
 
 <script>
-    // Адрес вашего запущенного бэкенда бота
+   // Адрес вашего запущенного бэкенда бота
     const API_URL = 'http://localhost:8080';
 
     // Функция автоматической загрузки данных при открытии панели
@@ -171,7 +171,7 @@
                 document.getElementById('base_price').value = data.base_price;
                 document.getElementById('per_km_price').value = data.per_km_price;
                 
-                // Выводим те самые правильные ссылки, полученные от бота
+                // Наполняем блоки правильными ссылками от бота
                 document.getElementById('client_url').innerText = data.client_url;
                 document.getElementById('driver_url').innerText = data.driver_url;
                 document.getElementById('admin_url').innerText = data.admin_url;
