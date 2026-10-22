@@ -13,8 +13,7 @@
     
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
-        .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; }
-        .header img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
         #map { height: 35vh; width: 100%; background: #e5e3df; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
@@ -27,7 +26,6 @@
 </head>
 <body>
     <div class="header">
-        <img src="logo.png" alt="Taxi Logo">
         <h2>Заказ Такси Аркабай - Панфилово (2ГИС)</h2>
     </div>
     
@@ -59,7 +57,7 @@
 
         let myMap;
         let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; // Координаты Аркабай по умолчанию
+        let latA = 43.3644, lngA = 77.1215; 
         let latB = null, lngB = null;
         let distanceKm = 0, finalPrice = 400;
         let isManualMode = false;
@@ -193,11 +191,10 @@
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
-const commentText = document.getElementById('comment').value || "Absent"; 
-        const paymentText = document.getElementById('paymentMethod').value;
-
+            const commentText = document.getElementById('comment').value || "Отсутствует";
+            const paymentText = document.getElementById('paymentMethod').value;
         if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) { 
-            alert("Пожалуйста, укажите точки A и B на карте или в тексте!"); 
+            alert("Пожалуйста, укажите точки А и Б на карте или текстом!"); 
             return; 
         }
 
@@ -216,6 +213,7 @@ const commentText = document.getElementById('comment').value || "Absent";
             tg.sendData(JSON.stringify(orderData)); 
             tg.close(); 
         } else { 
-            alert("Данные заказа (локальный тест):\n" + JSON.stringify(orderData, null, 2)); 
+            alert("Данные заказа (Локальный тест):\n" + JSON.stringify(orderData, null, 2)); 
         } 
     });
+
