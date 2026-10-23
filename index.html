@@ -7,22 +7,14 @@
     <!-- Официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     
-    <!-- Подключаем только JavaScript Leaflet (он уже работает без блокировок) -->
+    <!-- ПОДКЛЮЧАЕМ СТИЛИ И СКРИПТЫ LEAFLET ЧЕРЕЗ СВЕРХСТАБИЛЬНЫЙ CDNJS -->
+    <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
     
     <style>
-        /* ВСТРАИВАЕМ БАЗОВЫЕ КРИТИЧЕСКИЕ СТИЛИ LEAFLET НАПРЯМУЮ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБКИ СЕТИ */
-        .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-map-pane svg, .leaflet-map-pane canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
-        .leaflet-container { overflow: hidden; -ms-touch-action: none; touch-action: none; cursor: -webkit-grab; cursor: -moz-grab; cursor: grab; -webkit-tap-highlight-color: transparent; }
-        .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
-        .leaflet-tile { filter: inherit; visibility: hidden; }
-        .leaflet-tile-loaded { visibility: inherit; }
-        .leaflet-zoom-animated { -webkit-transform-origin: 0 0; -ms-transform-origin: 0 0; transform-origin: 0 0; }
-        
-        /* Ваши основные стили оформления интерфейса */
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
-        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; position: relative; }
+        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
         input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
@@ -58,46 +50,59 @@
         let tg = window.Telegram?.WebApp || null;
         if (tg) tg.expand();
 
-               // Инициализируем карту Leaflet без внешней подложки
-        myMap = L.map('map', {
-            zoomControl: true,
-            boxZoom: false,
-            doubleClickZoom: true
-        }).setView([43.3644, 77.1215], 13); // Центрируем на Аркабай
+        let myMap;
+        let markerA, markerB;
+        let latA = 43.3644, lngA = 77.1215; 
+        let latB = null, lngB = null;
+        let finalPrice = 400;
+        let isManualMode = false;
 
-        // Создаем стили для отображения ваших дорог
-        const roadStyle = {
-            "color": "#2481cc", // Красивый синий цвет для улиц такси
-            "weight": 4,        // Толщина линий дорог
-            "opacity": 0.85
-        };
+        // БЕЗОПАСНАЯ ФУНКЦИЯ ОЖИДАНИЯ ЗАГРУЗКИ ОБЪЕКТА L
+        function initMapWhenReady() {
+            if (typeof L === 'undefined') {
+                // Если библиотека карт еще не догрузилась, ждем 100 миллисекунд и пробуем снова
+                setTimeout(initMapWhenReady, 100);
+                return;
+            }
 
-        // ЗАГРУЖАЕМ ВАШ ЛОКАЛЬНЫЙ GEOJSON ФАЙЛ КАРТЫ С GITHUB БЕЗ БЛОКИРОВОК
-        fetch('map_data.geojson')
-            .then(response => {
-                if (!response.ok) throw new Error('Файл карты не найден');
-                return response.json();
-            })
-            .then(geojsonData => {
-                // Отрисовываем векторные дороги на экране устройства
-                L.geoJSON(geojsonData, {
-                    style: roadStyle,
-                    onEachFeature: function (feature, layer) {
-                        // Если у улицы в OSM было имя, оно отобразится при клике
-                        if (feature.properties && feature.properties.name) {
-                            layer.bindPopup("Улица: " + feature.properties.name);
+            // Инициализируем карту Leaflet без внешней подложки тайлов
+            myMap = L.map('map', {
+                zoomControl: true,
+                boxZoom: false,
+                doubleClickZoom: true
+            }).setView([latA, lngA], 13);
+
+            // Стили отображения ваших дорог из GeoJSON
+            const roadStyle = {
+                "color": "#2481cc", 
+                "weight": 4,        
+                "opacity": 0.85
+            };
+
+            // Загружаем локальный GeoJSON файл карты напрямую с вашего GitHub
+            fetch('map_data.geojson')
+                .then(response => {
+                    if (!response.ok) throw new Error('Файл карты map_data.geojson не найден');
+                    return response.json();
+                })
+                .then(geojsonData => {
+                    // Отрисовываем векторные дороги на экране устройства
+                    L.geoJSON(geojsonData, {
+                        style: roadStyle,
+                        onEachFeature: function (feature, layer) {
+                            if (feature.properties && feature.properties.name) {
+                                layer.bindPopup("Улица: " + feature.properties.name);
+                            }
                         }
-                    }
-                }).addTo(myMap);
-                
-                // После успешной отрисовки дорог создаем маркер Точки А
-                initMarkers();
-            })
-            .catch(error => {
-                console.error("Ошибка загрузки локальной карты:", error);
-                // Резервный запуск маркеров, если файл еще коммитится на GitHub
-                initMarkers();
-            });
+                    }).addTo(myMap);
+                    
+                    initMarkers();
+                })
+                .catch(error => {
+                    console.error("Ошибка загрузки локальной карты GeoJSON:", error);
+                    initMarkers();
+                });
+        }
 
         function initMarkers() {
             if (markerA) return; // Защита от дублирования
@@ -112,7 +117,6 @@
                 geocodeAddress(latA, lngA, 'from');
             });
 
-            // Клик ставит Точку Б
             myMap.on('click', function (e) {
                 latB = e.latlng.lat; lngB = e.latlng.lng;
                 isManualMode = false;
@@ -131,13 +135,13 @@
             });
         }
 
-
-        // Запуск
+        // Запускаем безопасную инициализацию
         initMapWhenReady();
 
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
+        // Рабочий геокодер
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -205,19 +209,13 @@
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
                 navigator.geolocation.getCurrentPosition((position) => {
-                    latA = position.coords.latitude;
-                    lngA = position.coords.longitude;
-                    if (myMap) {
-                        myMap.setView([latA, lngA], 16);
-                        if (markerA) markerA.setLatLng([latA, lngA]);
-                    }
-                    geocodeAddress(latA, lngA, 'from');
                 }, () => {
                     document.getElementById('from').value = "Не удалось определить GPS";
                 });
             }
         });
 
+        // Отправка готового заказа Telegram-боту 
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
@@ -229,7 +227,15 @@
                 return;
             }
 
-            const orderData = { from_address: fromText, to_address: toText, comment: commentText, payment_method: paymentText, price: finalPrice, lat: latA, lng: lngA };
+            const orderData = { 
+                from_address: fromText, 
+                to_address: toText, 
+                comment: commentText, 
+                payment_method: paymentText, 
+                price: finalPrice, 
+                lat: latA, 
+                lng: lngA 
+            };
 
             if (tg) {
                 tg.sendData(JSON.stringify(orderData));
