@@ -74,9 +74,9 @@
 
             myMap = L.map('map').setView([latA, lngA], 13);
             
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
+L.tileLayer('https://{s}://{z}/{x}/{y}{r}.png', {
+                maxZoom: 20,
+                attribution: '© OpenStreetMap © CARTO'
             }).addTo(myMap);
 
             markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
