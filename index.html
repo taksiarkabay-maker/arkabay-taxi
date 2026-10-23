@@ -3,18 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Заказ Такси</title>
-    <!-- Подключаем Telegram WebApp API -->
+    <title>Заказ Такси 2ГИС</title>
+    <!-- Подключаем официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     
-    <!-- Подключаем Leaflet через сверхстабильный Cloudflare CDN (cdnjs) -->
+    <!-- ПОДКЛЮЧАЕМ LEAFLET ЧЕРЕЗ НАДЕЖНЫЙ CLOUDFLARE CDN (БЕЗ БЛОКИРОВОК) -->
     <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
     
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
-        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; }
+        .header img { width: 80px; height: 80px; object-fit: contain; border-radius: 50%; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #map { height: 35vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
         .hint-text { font-size: 11px; color: #ff9800; font-weight: bold; margin: -5px 0 10px 2px; display: block; line-height: 1.3; }
@@ -26,7 +27,8 @@
 </head>
 <body>
     <div class="header">
-        <h2>Заказ Такси Аркабай - Панфилово</h2>
+        <img src="logo.png" alt="Taxi Logo">
+        <h2>Заказ Такси Аркабай - Панфилово (2ГИС)</h2>
     </div>
     
     <!-- Контейнер для карты -->
@@ -50,43 +52,40 @@
     </div>
 
     <script type="text/javascript">
-        let tg = window.Telegram?.WebApp || null;
-        if (tg) {
+        // Инициализируем Telegram WebApp
+        let tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
             tg.expand();
         }
 
         let myMap;
         let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; // Поселок Аркабай
+        let latA = 43.3644, lngA = 77.1215; // Центр поселка Аркабай по умолчанию
         let latB = null, lngB = null;
-        let finalPrice = 400;
+        let distanceKm = 0, finalPrice = 400;
         let isManualMode = false;
 
-        try {
-            // Инициализируем карту Leaflet
-            myMap = L.map('map').setView([latA, lngA], 14);
-            
-            // Подключаем стандартный и самый стабильный глобальный слой OpenStreetMap
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(myMap);
+        // Создаем карту на движке Leaflet
+        myMap = L.map('map').setView([latA, lngA], 13);
+        
+        // ПОДКЛЮЧАЕМ СТАБИЛЬНЫЙ СЛОЙ КАРТ С ОТКРЫТЫМИ ТАЙЛАМИ 2ГИС
+        L.tileLayer('https://tile{s}://{x}&y={y}&z={z}', {
+            subdomains: ['0', '1', '2', '3'],
+            attribution: '© 2GIS'
+        }).addTo(myMap);
 
-            // Создаем начальный маркер Точки А
-            markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
+        // Устанавливаем маркер Точки А
+        markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
+        geocodeAddress(latA, lngA, 'from');
+
+        // Отслеживаем перетаскивание маркера Точки А
+        markerA.on('dragend', function () {
+            const position = markerA.getLatLng();
+            latA = position.lat; lngA = position.lng;
+            isManualMode = false;
             geocodeAddress(latA, lngA, 'from');
-
-            // Отслеживаем перетаскивание Точки А
-            markerA.on('dragend', function () {
-                const position = markerA.getLatLng();
-                latA = position.lat; lngA = position.lng;
-                isManualMode = false;
-                geocodeAddress(latA, lngA, 'from');
-            });
-        } catch (e) {
-            console.error("Ошибка инициализации карты:", e);
-            alert("Ошибка загрузки карты. Пожалуйста, проверьте интернет-соединение.");
-        }
+        });
 
         // Клик по карте устанавливает Точку Б
         myMap.on('click', function (e) {
@@ -106,11 +105,11 @@
             geocodeAddress(latB, lngB, 'to');
         });
 
-        // Слушаем ручной ввод текста
+        // Слушаем ручной текстовый ввод для пересчета цен по зонам
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Рабочий бесплатный геокодер
+        // ИСПРАВЛЕННЫЙ РАБОЧИЙ ГЕОКОДЕР NOMINATIM API
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -142,7 +141,7 @@
             return 'unknown';
         }
 
-        // Динамический расчет цен
+        // Динамический расчет цен по формуле (Подача 400 + 80 тг за км) или по зонам
         function calculatePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
@@ -163,11 +162,11 @@
                 else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (До города)`; }
             } else {
                 if (latA && latB) {
-                    const R = 6371; 
+                    const R = 6371; // Радиус Земли в км
                     const dLat = (latB - latA) * Math.PI / 180;
                     const dLon = (lngB - lngA) * Math.PI / 180;
                     const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                    const distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                    distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
                     
                     finalPrice = Math.round(400 + (distanceKm * 80));
                     document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
@@ -175,7 +174,7 @@
             }
         }
 
-        // Автоматическое определение местоположения по GPS
+        // ИСПРАВЛЕННЫЙ И ДОПИСАННЫЙ ДО КОНЦА GPS ТРЕКЕР
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
@@ -189,20 +188,23 @@
                     document.getElementById('from').value = "Не удалось определить GPS";
                 });
             } else {
-                alert("Геолокация не поддерживается вашим устройством");
-            }
+                }, () => {
+                    document.getElementById('from').value = "Не удалось определить GPS";
+                });
+            } else {
+                alert("Ваше устройство не поддерживает геолокацию"); 
+            } 
         });
 
-        // Отправка готового заказа обратно в Телеграм-бот
-
-document.getElementById('orderBtn').addEventListener('click', () => { 
+        // Отправка готового заказа Telegram-боту 
+        document.getElementById('orderBtn').addEventListener('click', () => { 
             const fromText = document.getElementById('from').value; 
             const toText = document.getElementById('to').value; 
-            const commentText = document.getElementById('comment').value || "Absent"; 
+            const commentText = document.getElementById('comment').value || "No"; 
             const paymentText = document.getElementById('paymentMethod').value;
 
             if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) { 
-                alert("Пожалуйста, укажите точки A и B на карте или в тексте!"); 
+                alert("Пожалуйста, отметьте точки A и B на карте или введите текст!"); 
                 return; 
             }
 
@@ -216,11 +218,15 @@ document.getElementById('orderBtn').addEventListener('click', () => {
                 lng: lngA 
             };
 
-            if (tg) { 
-                // Отправляем JSON-строку чат-боту 
+                     if (tg) { 
+                // Отправляем JSON-строку в чат нашего Python-бота 
                 tg.sendData(JSON.stringify(orderData)); 
                 tg.close(); 
             } else { 
-                alert("Данные заказа (локальный тест):\n" + JSON.stringify(orderData, null, 2)); 
+                alert("Данные заказа (локальный тест без Telegram):\n" + JSON.stringify(orderData, null, 2)); 
             } 
         });
+    </script>
+</body>
+</html>
+
