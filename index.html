@@ -1,18 +1,16 @@
 <!DOCTYPE html>
 <html lang="ru">
-<!DOCTYPE html>
-<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси</title>
-    <!-- Официальный скрипт Telegram WebApp API -->
+    
+    <!-- Сначала подключаем сам скрипт Telegram -->
     <script src="https://telegram.org"></script>
     
-    <!-- ПРАВИЛЬНОЕ И СТАБИЛЬНОЕ ПОДКЛЮЧЕНИЕ КАРТ LEAFLET (cdnjs Cloudflare) -->
+    <!-- НАДЁЖНОЕ ПОДКЛЮЧЕНИЕ СТИЛЕЙ И СКРИПТОВ LEAFLET (cdnjs) -->
     <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
-</head>
     
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
@@ -31,7 +29,7 @@
         <h2>Заказ Такси Аркабай - Панфилово</h2>
     </div>
     
-    <!-- Окно карты -->
+    <!-- Физическое окно карты -->
     <div id="map"></div>
     
     <div class="container">
@@ -50,167 +48,158 @@
     </div>
 
     <script type="text/javascript">
-        let tg = window.Telegram?.WebApp || null;
-        if (tg) tg.expand();
+        // Ожидаем полную загрузку страницы и скриптов Leaflet
+        window.addEventListener('DOMContentLoaded', () => {
+            let tg = window.Telegram?.WebApp || null;
+            if (tg) tg.expand();
 
-        let myMap;
-        let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; 
-        let latB = null, lngB = null;
-        let finalPrice = 400;
-        let isManualMode = false;
+            let myMap;
+            let markerA, markerB;
+            let latA = 43.3644, lngA = 77.1215; 
+            let latB = null, lngB = null;
+            let finalPrice = 400;
+            let isManualMode = false;
 
-        // Создаем карту
-        myMap = L.map('map').setView([latA, lngA], 13);
-        
-        // Подключаем стабильный HTTPS слой карт OpenStreetMap
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '© OpenStreetMap'
-        }).addTo(myMap);
+            // Инициализируем карту (теперь объект L точно загружен)
+            myMap = L.map('map').setView([latA, lngA], 13);
+            
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
+            }).addTo(myMap);
 
-        // Ставим маркер Точки А
-        markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
-        geocodeAddress(latA, lngA, 'from');
-
-        markerA.on('dragend', function () {
-            const position = markerA.getLatLng();
-            latA = position.lat; lngA = position.lng;
-            isManualMode = false;
+            markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
             geocodeAddress(latA, lngA, 'from');
-        });
 
-        // Клик по карте ставит Точку Б
-        myMap.on('click', function (e) {
-            latB = e.latlng.lat; lngB = e.latlng.lng;
-            isManualMode = false;
+            markerA.on('dragend', function () {
+                const position = markerA.getLatLng();
+                latA = position.lat; lngA = position.lng;
+                isManualMode = false;
+                geocodeAddress(latA, lngA, 'from');
+            });
 
-            if (markerB) {
-                markerB.setLatLng(e.latlng);
-            } else {
-                markerB = L.marker([latB, lngB], {draggable: true}).addTo(myMap);
-                markerB.on('dragend', function () {
-                    const pos = markerB.getLatLng();
-                    latB = pos.lat; lngB = pos.lng;
-                    geocodeAddress(latB, lngB, 'to');
-                });
+            myMap.on('click', function (e) {
+                latB = e.latlng.lat; lngB = e.latlng.lng;
+                isManualMode = false;
+
+                if (markerB) {
+                    markerB.setLatLng(e.latlng);
+                } else {
+                    markerB = L.marker([latB, lngB], {draggable: true}).addTo(myMap);
+                    markerB.on('dragend', function () {
+                        const pos = markerB.getLatLng();
+                        latB = pos.lat; lngB = pos.lng;
+                        geocodeAddress(latB, lngB, 'to');
+                    });
+                }
+                geocodeAddress(latB, lngB, 'to');
+            });
+
+            document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
+            document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
+
+            function geocodeAddress(lat, lng, inputId) {
+                const inputField = document.getElementById(inputId);
+                inputField.value = "⏳ Распознаем адрес...";
+
+                fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.address) {
+                            const road = data.address.road || "";
+                            const house = data.address.house_number || "";
+                            const village = data.address.village || data.address.suburb || data.address.town || data.address.city || "";
+                            inputField.value = `${village} ${road} ${house}`.trim().replace(/\s+/g, ' ') || "Точка на карте";
+                        } else {
+                            inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                        }
+                        calculatePrice();
+                    }).catch(() => {
+                        inputField.value = "Геометка установлена";
+                        calculatePrice();
+                    });
             }
-            geocodeAddress(latB, lngB, 'to');
-        });
 
-        document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
-        document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
+            function getZone(addressText) {
+                const txt = addressText.toLowerCase();
+                if (txt.includes('аркабай') || txt.includes('аркабаи')) return 'arkabay';
+                if (txt.includes('панфилово') || txt.includes('панфилов')) return 'panfilovo';
+                if (txt.includes('талгар')) return 'talgar';
+                if (txt.includes('алматы') || txt.includes('алмата') || txt.includes('город')) return 'almaty';
+                return 'unknown';
+            }
 
-        // Обратное геокодирование (координаты -> адрес)
-        function geocodeAddress(lat, lng, inputId) {
-            const inputField = document.getElementById(inputId);
-            inputField.value = "⏳ Распознаем адрес...";
+            function calculatePrice() {
+                const fromVal = document.getElementById('from').value;
+                const toVal = document.getElementById('to').value;
 
-            fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.address) {
-                        const road = data.address.road || "";
-                        const house = data.address.house_number || "";
-                        const village = data.address.village || data.address.suburb || data.address.town || data.address.city || "";
-                        inputField.value = `${village} ${road} ${house}`.trim().replace(/\s+/g, ' ') || "Точка на карте";
-                    } else {
-                        inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                if (isManualMode && fromVal && toVal) {
+                    const zoneA = getZone(fromVal);
+                    const zoneB = getZone(toVal);
+
+                    if (zoneA === 'unknown' || zoneB === 'unknown') {
+                        finalPrice = 400;
+                        document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
+                        return;
                     }
-                    calculatePrice();
-                }).catch(() => {
-                    inputField.value = "Геометка установлена";
-                    calculatePrice();
-                });
-        }
 
-        function getZone(addressText) {
-            const txt = addressText.toLowerCase();
-            if (txt.includes('аркабай') || txt.includes('аркабаи')) return 'arkabay';
-            if (txt.includes('панфилово') || txt.includes('панфилов')) return 'panfilovo';
-            if (txt.includes('талгар')) return 'talgar';
-            if (txt.includes('алматы') || txt.includes('алмата') || txt.includes('город')) return 'almaty';
-            return 'unknown';
-        }
-
-        // Автоматический расчет цены
-        function calculatePrice() {
-            const fromVal = document.getElementById('from').value;
-            const toVal = document.getElementById('to').value;
-
-            if (isManualMode && fromVal && toVal) {
-                const zoneA = getZone(fromVal);
-                const zoneB = getZone(toVal);
-
-                if (zoneA === 'unknown' || zoneB === 'unknown') {
-                    finalPrice = 400;
+                    if (zoneA === zoneB) { finalPrice = 500; }
+                    else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; }
+                    else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; }
+                    else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; }
                     document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
+                } else {
+                    if (latA && latB) {
+                        const R = 6371; 
+                        const dLat = (latB - latA) * Math.PI / 180;
+                        const dLon = (lngB - lngA) * Math.PI / 180;
+                        const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
+                        const distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+                        finalPrice = Math.round(400 + (distanceKm * 80));
+                        document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
+                    }
+                }
+            }
+
+            document.getElementById('geoBtn').addEventListener('click', () => {
+                if (navigator.geolocation) {
+                    document.getElementById('from').value = "⏳ GPS поиск...";
+                    navigator.geolocation.getCurrentPosition((position) => {
+                        latA = position.coords.latitude;
+                        lngA = position.coords.longitude;
+                        myMap.setView([latA, lngA], 16);
+                        markerA.setLatLng([latA, lngA]);
+                        geocodeAddress(latA, lngA, 'from');
+                    }, () => {
+                        document.getElementById('from').value = "Не удалось определить GPS";
+                    });
+                }
+            });
+
+            document.getElementById('orderBtn').addEventListener('click', () => {
+                const fromText = document.getElementById('from').value;
+                const toText = document.getElementById('to').value;
+                const commentText = document.getElementById('comment').value || "No";
+                const paymentText = document.getElementById('paymentMethod').value;
+
+                if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) {
+                    alert("Пожалуйста, отметьте точки A и B на карте или введите текст!");
                     return;
                 }
 
-                if (zoneA === zoneB) { finalPrice = 500; }
-                else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; }
-                else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; }
-                else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; }
-                document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
-            } else {
-                if (latA && latB) {
-                    const R = 6371; 
-                    const dLat = (latB - latA) * Math.PI / 180;
-                    const dLon = (lngB - lngA) * Math.PI / 180;
-                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                    const distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-                    finalPrice = Math.round(400 + (distanceKm * 80));
-                    document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
-                }
-            }
-        }
+                const orderData = { from_address: fromText, to_address: toText, comment: commentText, payment_method: paymentText, price: finalPrice, lat: latA, lng: lngA };
 
-       // Нахождение геолокации по GPS смартфона/ПК
-        document.getElementById('geoBtn').addEventListener('click', () => {
-            if (navigator.geolocation) {
-                document.getElementById('from').value = "⏳ GPS поиск...";
-                navigator.geolocation.getCurrentPosition((position) => {
-                    latA = position.coords.latitude;
-                    lngA = position.coords.longitude;
-                    myMap.setView([latA, lngA], 16);
-                    markerA.setLatLng([latA, lngA]);
-                    geocodeAddress(latA, lngA, 'from');
-                }, () => {
-                    document.getElementById('from').value = "Не удалось определить GPS";
-                });
-            }
-        });
-
-        // Отправка JSON-строки в бот
-        document.getElementById('orderBtn').addEventListener('click', () => {
-            const fromText = document.getElementById('from').value;
-            const toText = document.getElementById('to').value;
-            const commentText = document.getElementById('comment').value || "No";
-            const paymentText = document.getElementById('paymentMethod').value;
-
-            if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) {
-                alert("Пожалуйста, отметьте точки A и B на карте или введите текст!");
-                return;
-            }
-
-            const orderData = { 
-                from_address: fromText, 
-                to_address: toText, 
-                comment: commentText, 
-                payment_method: paymentText, 
-                price: finalPrice, 
-                lat: latA, 
-                lng: lngA 
-            };
-
-            if (tg) {
+                if (tg) {
+                    tg.sendData(JSON.stringify(orderData));
+                    tg.close();
+if (tg) { 
                 tg.sendData(JSON.stringify(orderData));
                 tg.close();
-            } else {
-                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2));
-            }
+            } else { 
+                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2)); 
+            } 
         });
-    </script>
+    });
+</script>
 </body>
 </html>
