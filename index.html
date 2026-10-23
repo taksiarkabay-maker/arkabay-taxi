@@ -4,11 +4,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси</title>
-    
-    <!-- Скрипт Telegram WebApp API -->
+    <!-- Официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     
-    <!-- ПОДКЛЮЧАЕМ СТИЛИ И СКРИПТЫ LEAFLET ЧЕРЕЗ СВЕРХСТАБИЛЬНЫЙ CDNJS -->
+    <!-- Подключаем Leaflet через стабильный Cloudflare CDN -->
     <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
     
@@ -58,24 +57,20 @@
         let finalPrice = 400;
         let isManualMode = false;
 
-        // БЕЗОПАСНАЯ ИНИЦИАЛИЗАЦИЯ КАРТЫ С ЗАЩИТОЙ ОТ ОШИБКИ "L IS NOT DEFINED"
+        // Безопасное ожидание загрузки Leaflet
         function initMapWhenReady() {
             if (typeof L === 'undefined') {
-                // Если библиотека карт еще не догрузилась, ждем 100 миллисекунд и пробуем снова
                 setTimeout(initMapWhenReady, 100);
                 return;
             }
 
-            // Создаем карту и привязываем к блоку id="map"
             myMap = L.map('map').setView([latA, lngA], 13);
             
-            // Подключаем стабильный HTTPS-слой OpenStreetMap (не блокируется браузерами)
             L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
                 maxZoom: 19,
                 attribution: '© OpenStreetMap'
             }).addTo(myMap);
 
-            // Ставим маркер Точки А
             markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
             geocodeAddress(latA, lngA, 'from');
 
@@ -86,7 +81,6 @@
                 geocodeAddress(latA, lngA, 'from');
             });
 
-            // Клик ставит Точку Б
             myMap.on('click', function (e) {
                 latB = e.latlng.lat; lngB = e.latlng.lng;
                 isManualMode = false;
@@ -105,13 +99,12 @@
             });
         }
 
-        // Запускаем безопасную проверку карт
+        // Запуск
         initMapWhenReady();
 
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Рабочий геокодер
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -181,9 +174,9 @@
                 navigator.geolocation.getCurrentPosition((position) => {
                     latA = position.coords.latitude;
                     lngA = position.coords.longitude;
-                    if(myMap) {
+                    if (myMap) {
                         myMap.setView([latA, lngA], 16);
-                        if(markerA) markerA.setLatLng([latA, lngA]);
+                        if (markerA) markerA.setLatLng([latA, lngA]);
                     }
                     geocodeAddress(latA, lngA, 'from');
                 }, () => {
@@ -202,12 +195,15 @@
                 alert("Пожалуйста, отметьте точки A и B на карте или введите текст!");
                 return;
             }
-            if (tg) { 
-                tg.sendData(JSON.stringify(orderData)); 
-                tg.close(); 
-            } else { 
-                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2)); 
-            } 
+
+            const orderData = { from_address: fromText, to_address: toText, comment: commentText, payment_method: paymentText, price: finalPrice, lat: latA, lng: lngA };
+
+            if (tg) {
+                tg.sendData(JSON.stringify(orderData));
+                tg.close();
+            } else {
+                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2));
+            }
         });
     </script>
 </body>
