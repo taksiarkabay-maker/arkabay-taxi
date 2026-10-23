@@ -7,14 +7,22 @@
     <!-- Официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
     
-    <!-- Подключаем Leaflet через стабильный Cloudflare CDN -->
-    <link rel="stylesheet" href="https://cloudflare.com" />
+    <!-- Подключаем только JavaScript Leaflet (он уже работает без блокировок) -->
     <script src="https://cloudflare.com"></script>
     
     <style>
+        /* ВСТРАИВАЕМ БАЗОВЫЕ КРИТИЧЕСКИЕ СТИЛИ LEAFLET НАПРЯМУЮ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБКИ СЕТИ */
+        .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-map-pane svg, .leaflet-map-pane canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
+        .leaflet-container { overflow: hidden; -ms-touch-action: none; touch-action: none; cursor: -webkit-grab; cursor: -moz-grab; cursor: grab; -webkit-tap-highlight-color: transparent; }
+        .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
+        .leaflet-tile { filter: inherit; visibility: hidden; }
+        .leaflet-tile-loaded { visibility: inherit; }
+        .leaflet-zoom-animated { -webkit-transform-origin: 0 0; -ms-transform-origin: 0 0; transform-origin: 0 0; }
+        
+        /* Ваши основные стили оформления интерфейса */
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
-        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; }
+        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; position: relative; }
         .container { padding: 15px; }
         .input-group { margin-bottom: 10px; }
         input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
