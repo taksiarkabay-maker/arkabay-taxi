@@ -46,47 +46,54 @@
         <button id="orderBtn">Заказать такси</button>
     </div>
 
-    <script type="text/javascript">
-        let tg = window.Telegram?.WebApp || null;
-        if (tg) tg.expand();
+        // Инициализируем Telegram WebApp API
+        let tg = null;
+        if (window.Telegram && window.Telegram.WebApp) {
+            tg = window.Telegram.WebApp;
+            tg.expand();
+        }
 
-        let myMap;
-        let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; 
-        let latB = null, lngB = null;
+        // Объявляем глобальные переменные БЕЗ прямого вызова Leaflet на старте
+        let myMap = null;
+        let markerA = null;
+        let markerB = null;
+        let latA = 43.3644;
+        let lngA = 77.1215; // Центр поселка Аркабай по умолчанию
+        let latB = null;
+        let lngB = null;
         let finalPrice = 400;
         let isManualMode = false;
 
-        // БЕЗОПАСНАЯ ФУНКЦИЯ ОЖИДАНИЯ ЗАГРУЗКИ ОБЪЕКТА L
+        // БЕЗОПАСНАЯ ФУНКЦИЯ ОЖИДАНИЯ: Запуск только после полной загрузки Leaflet в браузер
         function initMapWhenReady() {
             if (typeof L === 'undefined') {
-                // Если библиотека карт еще не догрузилась, ждем 100 миллисекунд и пробуем снова
+                // Если объект L еще не определен, ждем 100 миллисекунд и пробуем снова
                 setTimeout(initMapWhenReady, 100);
                 return;
             }
 
-            // Инициализируем карту Leaflet без внешней подложки тайлов
+            // Инициализируем карту Leaflet внутри блока <div id="map">
             myMap = L.map('map', {
                 zoomControl: true,
                 boxZoom: false,
                 doubleClickZoom: true
             }).setView([latA, lngA], 13);
 
-            // Стили отображения ваших дорог из GeoJSON
+            // Стили отображения ваших векторных дорог из GeoJSON
             const roadStyle = {
                 "color": "#2481cc", 
                 "weight": 4,        
                 "opacity": 0.85
             };
 
-            // Загружаем локальный GeoJSON файл карты напрямую с вашего GitHub
+            // Загружаем локальный GeoJSON файл карты напрямую из вашего репозитория GitHub
             fetch('map_data.geojson')
                 .then(response => {
-                    if (!response.ok) throw new Error('Файл карты map_data.geojson не найден');
+                    if (!response.ok) throw new Error('Файл карты map_data.geojson не найден в корне сайта');
                     return response.json();
                 })
                 .then(geojsonData => {
-                    // Отрисовываем векторные дороги на экране устройства
+                    // Отрисовываем схему дорог на экране устройства пассажира
                     L.geoJSON(geojsonData, {
                         style: roadStyle,
                         onEachFeature: function (feature, layer) {
@@ -96,16 +103,19 @@
                         }
                     }).addTo(myMap);
                     
+                    // После отрисовки дорог безопасно создаем маркеры
                     initMarkers();
                 })
                 .catch(error => {
                     console.error("Ошибка загрузки локальной карты GeoJSON:", error);
+                    // Если GeoJSON временно недоступен, все равно запускаем маркеры на пустой сетке
                     initMarkers();
                 });
         }
 
+        // Функция создания маркеров А и Б
         function initMarkers() {
-            if (markerA) return; // Защита от дублирования
+            if (!myMap || markerA) return; // Защита от дублирования
             
             markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
             geocodeAddress(latA, lngA, 'from');
@@ -135,13 +145,14 @@
             });
         }
 
-        // Запускаем безопасную инициализацию
+        // ТОЧКА ВХОДА: Запускаем безопасный цикл контроля загрузки
         initMapWhenReady();
 
+        // Слушаем ручной ввод текста и пересчитываем цены по зонам
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Рабочий геокодер
+        // Обратное геокодирование через Nominatim API
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -173,6 +184,7 @@
             return 'unknown';
         }
 
+        // Расчет стоимости (Подача 400 + 80 за 1 км)
         function calculatePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
@@ -205,17 +217,25 @@
             }
         }
 
+        // Нативная GPS кнопка определения геопозиции
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
                 navigator.geolocation.getCurrentPosition((position) => {
+                    latA = position.coords.latitude;
+                    lngA = position.coords.longitude;
+                    if (myMap) {
+                        myMap.setView([latA, lngA], 16);
+                        if (markerA) markerA.setLatLng([latA, lngA]);
+                    }
+                    geocodeAddress(latA, lngA, 'from');
                 }, () => {
                     document.getElementById('from').value = "Не удалось определить GPS";
                 });
             }
         });
 
-        // Отправка готового заказа Telegram-боту 
+        // Отправка готового заказа обратно в Телеграм-бот пассажира
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
@@ -241,9 +261,9 @@
                 tg.sendData(JSON.stringify(orderData));
                 tg.close();
             } else {
-                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2));
+                alert("Локальный тест (Без Telegram):\n" + JSON.stringify(orderData, null, 2));
             }
         });
-    </script>
+
 </body>
 </html>
