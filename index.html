@@ -163,7 +163,7 @@
             }
         }
 
-        // Нахождение геолокации по GPS смартфона/ПК
+       // Нахождение геолокации по GPS смартфона/ПК
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
@@ -191,7 +191,15 @@
                 return;
             }
 
-            const orderData = { from_address: fromText, to_address: toText, comment: commentText, payment_method: paymentText, price: finalPrice, lat: latA, lng: lngA };
+            const orderData = { 
+                from_address: fromText, 
+                to_address: toText, 
+                comment: commentText, 
+                payment_method: paymentText, 
+                price: finalPrice, 
+                lat: latA, 
+                lng: lngA 
+            };
 
             if (tg) {
                 tg.sendData(JSON.stringify(orderData));
