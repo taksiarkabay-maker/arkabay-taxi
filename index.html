@@ -58,29 +58,50 @@
         let tg = window.Telegram?.WebApp || null;
         if (tg) tg.expand();
 
-        let myMap;
-        let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; 
-        let latB = null, lngB = null;
-        let finalPrice = 400;
-        let isManualMode = false;
+               // Инициализируем карту Leaflet без внешней подложки
+        myMap = L.map('map', {
+            zoomControl: true,
+            boxZoom: false,
+            doubleClickZoom: true
+        }).setView([43.3644, 77.1215], 13); // Центрируем на Аркабай
 
-        // Безопасное ожидание загрузки Leaflet
-        function initMapWhenReady() {
-            if (typeof L === 'undefined') {
-                setTimeout(initMapWhenReady, 100);
-                return;
-            }
+        // Создаем стили для отображения ваших дорог
+        const roadStyle = {
+            "color": "#2481cc", // Красивый синий цвет для улиц такси
+            "weight": 4,        // Толщина линий дорог
+            "opacity": 0.85
+        };
 
-            myMap = L.map('map').setView([latA, lngA], 13);
+        // ЗАГРУЖАЕМ ВАШ ЛОКАЛЬНЫЙ GEOJSON ФАЙЛ КАРТЫ С GITHUB БЕЗ БЛОКИРОВОК
+        fetch('map_data.geojson')
+            .then(response => {
+                if (!response.ok) throw new Error('Файл карты не найден');
+                return response.json();
+            })
+            .then(geojsonData => {
+                // Отрисовываем векторные дороги на экране устройства
+                L.geoJSON(geojsonData, {
+                    style: roadStyle,
+                    onEachFeature: function (feature, layer) {
+                        // Если у улицы в OSM было имя, оно отобразится при клике
+                        if (feature.properties && feature.properties.name) {
+                            layer.bindPopup("Улица: " + feature.properties.name);
+                        }
+                    }
+                }).addTo(myMap);
+                
+                // После успешной отрисовки дорог создаем маркер Точки А
+                initMarkers();
+            })
+            .catch(error => {
+                console.error("Ошибка загрузки локальной карты:", error);
+                // Резервный запуск маркеров, если файл еще коммитится на GitHub
+                initMarkers();
+            });
+
+        function initMarkers() {
+            if (markerA) return; // Защита от дублирования
             
-            // Теперь Leaflet будет брать картинки напрямую из вашей папки map_tiles на GitHub
-            L.tileLayer('map_tiles/{z}/{x}/{y}.png', {
-                minZoom: 12, // Ограничим зум, чтобы не скачивать гигабайты лишних данных
-                maxZoom: 16,
-                attribution: 'Локальная карта'
-            }).addTo(myMap);
-
             markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
             geocodeAddress(latA, lngA, 'from');
 
@@ -91,6 +112,7 @@
                 geocodeAddress(latA, lngA, 'from');
             });
 
+            // Клик ставит Точку Б
             myMap.on('click', function (e) {
                 latB = e.latlng.lat; lngB = e.latlng.lng;
                 isManualMode = false;
@@ -108,6 +130,7 @@
                 geocodeAddress(latB, lngB, 'to');
             });
         }
+
 
         // Запуск
         initMapWhenReady();
