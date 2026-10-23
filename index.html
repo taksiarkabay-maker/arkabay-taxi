@@ -4,9 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Заказ Такси</title>
+    <!-- Официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
+    
+    <!-- Подключаем Leaflet через стабильный Cloudflare CDN -->
     <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
+    
     <style>
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
@@ -24,6 +28,7 @@
         <h2>Заказ Такси Аркабай - Панфилово</h2>
     </div>
     
+    <!-- Окно карты -->
     <div id="map"></div>
     
     <div class="container">
@@ -52,13 +57,16 @@
         let finalPrice = 400;
         let isManualMode = false;
 
+        // Создаем карту
         myMap = L.map('map').setView([latA, lngA], 13);
         
+        // Подключаем стабильный HTTPS слой карт OpenStreetMap
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap'
         }).addTo(myMap);
 
+        // Ставим маркер Точки А
         markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
         geocodeAddress(latA, lngA, 'from');
 
@@ -69,6 +77,7 @@
             geocodeAddress(latA, lngA, 'from');
         });
 
+        // Клик по карте ставит Точку Б
         myMap.on('click', function (e) {
             latB = e.latlng.lat; lngB = e.latlng.lng;
             isManualMode = false;
@@ -89,6 +98,7 @@
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
+        // Обратное геокодирование (координаты -> адрес)
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -120,6 +130,7 @@
             return 'unknown';
         }
 
+        // Автоматический расчет цены
         function calculatePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
@@ -152,6 +163,7 @@
             }
         }
 
+        // Нахождение геолокации по GPS смартфона/ПК
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
@@ -167,6 +179,7 @@
             }
         });
 
+        // Отправка JSON-строки в бот
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
