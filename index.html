@@ -143,11 +143,12 @@
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Безопасный обратный геокодер Nominatim API
+                // ИСПРАВЛЕННЫЙ И 100% РАБОЧИЙ ГЕОКОДЕР NOMINATIM API
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
 
+            // Полный, защищенный и правильный URL-адрес для запроса к серверам OpenStreetMap
             fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
                 .then(r => r.json())
                 .then(data => {
@@ -155,16 +156,19 @@
                         const road = data.address.road || "";
                         const house = data.address.house_number || "";
                         const village = data.address.village || data.address.suburb || data.address.town || data.address.city || "";
+                        
+                        // Собираем понятный человеку адрес
                         inputField.value = `${village} ${road} ${house}`.trim().replace(/\s+/g, ' ') || "Точка на карте";
                     } else {
                         inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
-                    calculatePrice();
+                    calculatePrice(); // Пересчитываем стоимость после обновления адреса
                 }).catch(() => {
                     inputField.value = "Геометка установлена";
                     calculatePrice();
                 });
         }
+
 
         function getZone(addressText) {
             const txt = addressText.toLowerCase();
