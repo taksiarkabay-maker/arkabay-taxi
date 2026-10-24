@@ -72,7 +72,7 @@
         const localRoadsData = {
             "type": "FeatureCollection",
             "features": [
-                { "type": "Feature", "properties": { "name": "Кульджинский管 тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
+                { "type": "Feature", "properties": { "name": "Кульджинский тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
                 { "type": "Feature", "properties": { "name": "ул. Мира (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1150, 43.3610], [77.1215, 43.3644], [77.1300, 43.3680]] } },
                 { "type": "Feature", "properties": { "name": "ул. Ленина (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1200, 43.3580], [77.1215, 43.3644], [77.1230, 43.3720]] } },
                 { "type": "Feature", "properties": { "name": "ул. Жансугурова (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1400, 43.3500], [77.1450, 43.3550], [77.1500, 43.3620]] } },
@@ -190,6 +190,7 @@
                     document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
                     return;
                 }
+
                 if (zoneA === zoneB) { finalPrice = 500; }
                 else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; }
                 else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; }
@@ -258,3 +259,4 @@
     </script>
 </body>
 </html>
+
