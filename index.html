@@ -5,12 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Карта Такси</title>
     
-    <!-- Стабильное подключение библиотек карт Leaflet через Cloudflare CDN -->
-    <link rel="stylesheet" href="https://cloudflare.com" />
+    <!-- Подключаем только JavaScript Leaflet через стабильный Cloudflare CDN -->
     <script src="https://cloudflare.com"></script>
     
     <style>
-        /* Растягиваем карту на всю ширину и высоту экрана устройства */
+        /* ВСТРАИВАЕМ БАЗОВЫЕ КРИТИЧЕСКИЕ СТИЛИ LEAFLET НАПРЯМУЮ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБОК СЕТИ */
+        .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-map-pane svg, .leaflet-map-pane canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
+        .leaflet-container { overflow: hidden; -ms-touch-action: none; touch-action: none; cursor: -webkit-grab; cursor: -moz-grab; cursor: grab; -webkit-tap-highlight-color: transparent; }
+        .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
+        .leaflet-tile { filter: inherit; visibility: hidden; }
+        .leaflet-tile-loaded { visibility: inherit; }
+        .leaflet-zoom-animated { -webkit-transform-origin: 0 0; -ms-transform-origin: 0 0; transform-origin: 0 0; }
+        .leaflet-popup { position: absolute; text-align: center; margin-bottom: 20px; }
+        .leaflet-popup-content-wrapper { padding: 1px; text-align: left; border-radius: 12px; background: white; box-shadow: 0 3px 14px rgba(0,0,0,0.4); }
+        .leaflet-popup-content { margin: 13px 19px; line-height: 1.4; font-size: 14px; }
+        
+        /* Растягиваем карту на весь экран */
         html, body {
             margin: 0;
             padding: 0;
@@ -27,7 +37,7 @@
 </head>
 <body>
 
-    <!-- Единственный контейнер для отображения карты -->
+    <!-- Контейнер для отображения карты -->
     <div id="map"></div>
 
     <script type="text/javascript">
@@ -38,25 +48,49 @@
                 return;
             }
 
-            // Координаты центра поселка Аркабай (Талгарский район)
-            const lat = 43.3644;
-            const lng = 77.1215;
+            // Координаты центра поселка Аркабай для фокуса
+            const latA = 43.3644;
+            const lngA = 77.1215;
 
-            // Создаем карту внутри блока id="map" с базовым зумом 14
+            // Инициализируем карту Leaflet без внешней интернет-подложки
             const myMap = L.map('map', {
                 zoomControl: true,
                 boxZoom: false,
                 doubleClickZoom: true
-            }).setView([lat, lng], 14);
+            }).setView([latA, lngA], 13);
             
-            // Подключаем стабильный слой карт OpenStreetMap по протоколу HTTPS
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-                attribution: '© OpenStreetMap'
-            }).addTo(myMap);
+            // Настраиваем неоновый стиль отображения вашей дорожной сети такси
+            const roadStyle = {
+                "color": "#2481cc", // Красивый синий цвет для улиц
+                "weight": 5,        // Толщина линий дорог
+                "opacity": 0.9
+            };
 
-            // Ставим один аккуратный маркер в центр карты
-            L.marker([lat, lng]).addTo(myMap);
+            // Читаем локальный файл данных с вашего GitHub Pages
+            fetch('map_data.geojson')
+                .then(response => {
+                    if (!response.ok) throw new Error('Файл map_data.geojson не найден в корне сайта');
+                    return response.json();
+                })
+                .then(geojsonData => {
+                    // Отрисовываем векторную схему дорог на экране устройства
+                    L.geoJSON(geojsonData, {
+                        style: roadStyle,
+                        onEachFeature: function (feature, layer) {
+                            if (feature.properties && feature.properties.name) {
+                                layer.bindPopup("<b>Улица: " + feature.properties.name + "</b>");
+                            }
+                        }
+                    }).addTo(myMap);
+                    
+                    // Ставим один стартовый маркер в центр карты после загрузки дорог
+                    L.marker([latA, lngA]).addTo(myMap);
+                })
+                .catch(error => {
+                    console.error("Ошибка загрузки локальной карты GeoJSON:", error);
+                    // Резервный запуск маркера, если файл еще коммитится на GitHub
+                    L.marker([latA, lngA]).addTo(myMap);
+                });
         }
 
         // Запускаем безопасную инициализацию карты
