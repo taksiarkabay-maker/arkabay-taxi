@@ -1,99 +1,45 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Заказ Такси</title>
-    <!-- Официальный скрипт Telegram WebApp API -->
-    <script src="https://telegram.org"></script>
-    
-    <!-- ПОДКЛЮЧАЕМ СТИЛИ И СКРИПТЫ LEAFLET ЧЕРЕЗ СВЕРХСТАБИЛЬНЫЙ CDNJS -->
-    <link rel="stylesheet" href="https://cloudflare.com" />
-    <script src="https://cloudflare.com"></script>
-    
-    <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
-        .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
-        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; }
-        .container { padding: 15px; }
-        .input-group { margin-bottom: 10px; }
-        input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
-        button { width: 100%; padding: 12px; background: #2481cc; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; }
-        .geo-btn { background: #ff9800; margin-bottom: 8px; padding: 10px; font-size: 14px; }
-        .price-box { background: #f5f5f5; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 16px; border: 1px solid #ddd; color: #2481cc; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2>Заказ Такси Аркабай - Панфилово</h2>
-    </div>
-    
-    <!-- Окно карты -->
-    <div id="map"></div>
-    
-    <div class="container">
-        <button id="geoBtn" class="geo-btn">📍 Автоматически определить где я</button>
-        <div class="input-group"><input type="text" id="from" placeholder="Откуда (Точка А)"></div>
-        <div class="input-group"><input type="text" id="to" placeholder="Куда (Точка Б)"></div>
-        <div class="input-group"><input type="text" id="comment" placeholder="Комментарий к заказу"></div>
-        <div class="input-group">
-            <select id="paymentMethod">
-                <option value="💵 Наличные">💵 Наличные</option>
-                <option value="📱 Kaspi перевод">📱 Kaspi перевод</option>
-            </select>
-        </div>
-        <div class="price-box" id="priceDisplay">Стоимость: 400 ₸</div>
-        <button id="orderBtn">Заказать такси</button>
-    </div>
-
+    <script type="text/javascript">
         // Инициализируем Telegram WebApp API
-        let tg = null;
-        if (window.Telegram && window.Telegram.WebApp) {
-            tg = window.Telegram.WebApp;
-            tg.expand();
-        }
+        let tg = window.Telegram?.WebApp || null;
+        if (tg) tg.expand();
 
         // Объявляем глобальные переменные БЕЗ прямого вызова Leaflet на старте
         let myMap = null;
         let markerA = null;
         let markerB = null;
         let latA = 43.3644;
-        let lngA = 77.1215; // Центр поселка Аркабай по умолчанию
+        let lngA = 77.1215; 
         let latB = null;
         let lngB = null;
         let finalPrice = 400;
         let isManualMode = false;
 
-        // БЕЗОПАСНАЯ ФУНКЦИЯ ОЖИДАНИЯ: Запуск только после полной загрузки Leaflet в браузер
+        // БЕЗОПАСНАЯ ФУНКЦИЯ ОЖИДАНИЯ
         function initMapWhenReady() {
             if (typeof L === 'undefined') {
-                // Если объект L еще не определен, ждем 100 миллисекунд и пробуем снова
+                // Если объект L еще не готов, ждем 100 миллисекунд и пробуем снова
                 setTimeout(initMapWhenReady, 100);
                 return;
             }
 
-            // Инициализируем карту Leaflet внутри блока <div id="map">
+            // Инициализируем карту внутри блока id="map" (теперь объект L точно готов!)
             myMap = L.map('map', {
                 zoomControl: true,
                 boxZoom: false,
                 doubleClickZoom: true
             }).setView([latA, lngA], 13);
 
-            // Стили отображения ваших векторных дорог из GeoJSON
-            const roadStyle = {
-                "color": "#2481cc", 
-                "weight": 4,        
-                "opacity": 0.85
-            };
+            // Стили для векторных дорог из GeoJSON
+            const roadStyle = { "color": "#2481cc", "weight": 4, "opacity": 0.85 };
 
-            // Загружаем локальный GeoJSON файл карты напрямую из вашего репозитория GitHub
+            // Загружаем локальный GeoJSON файл карты напрямую из вашего репозитория
             fetch('map_data.geojson')
                 .then(response => {
-                    if (!response.ok) throw new Error('Файл карты map_data.geojson не найден в корне сайта');
+                    if (!response.ok) throw new Error('Файл карты map_data.geojson не найден');
                     return response.json();
                 })
                 .then(geojsonData => {
-                    // Отрисовываем схему дорог на экране устройства пассажира
+                    // Отрисовываем схему дорог на экране пассажира
                     L.geoJSON(geojsonData, {
                         style: roadStyle,
                         onEachFeature: function (feature, layer) {
@@ -103,19 +49,17 @@
                         }
                     }).addTo(myMap);
                     
-                    // После отрисовки дорог безопасно создаем маркеры
                     initMarkers();
                 })
                 .catch(error => {
-                    console.error("Ошибка загрузки локальной карты GeoJSON:", error);
-                    // Если GeoJSON временно недоступен, все равно запускаем маркеры на пустой сетке
+                    console.error("Ошибка загрузки локальной карты:", error);
                     initMarkers();
                 });
         }
 
         // Функция создания маркеров А и Б
         function initMarkers() {
-            if (!myMap || markerA) return; // Защита от дублирования
+            if (!myMap || markerA) return;
             
             markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
             geocodeAddress(latA, lngA, 'from');
@@ -148,11 +92,9 @@
         // ТОЧКА ВХОДА: Запускаем безопасный цикл контроля загрузки
         initMapWhenReady();
 
-        // Слушаем ручной ввод текста и пересчитываем цены по зонам
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // Обратное геокодирование через Nominatim API
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
@@ -184,7 +126,6 @@
             return 'unknown';
         }
 
-        // Расчет стоимости (Подача 400 + 80 за 1 км)
         function calculatePrice() {
             const fromVal = document.getElementById('from').value;
             const toVal = document.getElementById('to').value;
@@ -217,7 +158,6 @@
             }
         }
 
-        // Нативная GPS кнопка определения геопозиции
         document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
@@ -235,7 +175,6 @@
             }
         });
 
-        // Отправка готового заказа обратно в Телеграм-бот пассажира
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
@@ -247,23 +186,13 @@
                 return;
             }
 
-            const orderData = { 
-                from_address: fromText, 
-                to_address: toText, 
-                comment: commentText, 
-                payment_method: paymentText, 
-                price: finalPrice, 
-                lat: latA, 
-                lng: lngA 
-            };
+            const orderData = { from_address: fromText, to_address: toText, comment: commentText, payment_method: paymentText, price: finalPrice, lat: latA, lng: lngA };
 
             if (tg) {
                 tg.sendData(JSON.stringify(orderData));
                 tg.close();
             } else {
-                alert("Локальный тест (Без Telegram):\n" + JSON.stringify(orderData, null, 2));
+                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2));
             }
         });
-
-</body>
-</html>
+    </script>
