@@ -6,8 +6,23 @@
     <title>Заказ Такси</title>
     <!-- Официальный скрипт Telegram WebApp API -->
     <script src="https://telegram.org"></script>
-     
+    
+    <!-- Подключаем только JavaScript Leaflet через стабильный Cloudflare CDN -->
+    <script src="https://cloudflare.com"></script>
+    
     <style>
+        /* ВСТРАИВАЕМ БАЗОВЫЕ КРИТИЧЕСКИЕ СТИЛИ LEAFLET НАПРЯМУЮ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБОК СЕТИ */
+        .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-map-pane svg, .leaflet-map-pane canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
+        .leaflet-container { overflow: hidden; -ms-touch-action: none; touch-action: none; cursor: -webkit-grab; cursor: -moz-grab; cursor: grab; -webkit-tap-highlight-color: transparent; }
+        .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
+        .leaflet-tile { filter: inherit; visibility: hidden; }
+        .leaflet-tile-loaded { visibility: inherit; }
+        .leaflet-zoom-animated { -webkit-transform-origin: 0 0; -ms-transform-origin: 0 0; transform-origin: 0 0; }
+        .leaflet-popup { position: absolute; text-align: center; margin-bottom: 20px; }
+        .leaflet-popup-content-wrapper { padding: 1px; text-align: left; border-radius: 12px; background: white; box-shadow: 0 3px 14px rgba(0,0,0,0.4); }
+        .leaflet-popup-content { margin: 13px 19px; line-height: 1.4; font-size: 14px; }
+        
+        /* Основные стили оформления интерфейса такси */
         body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
         .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
         #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; position: relative; }
@@ -53,11 +68,11 @@
         let finalPrice = 400;
         let isManualMode = false;
 
-        // ВШИТАЯ ВЕКТОРНАЯ СХЕМА ОЗНАКОМИТЕЛЬНЫХ ДОРОГ ЗОНЫ ТАКСИ
+        // ВШИТАЯ ВЕКТОРНАЯ СХЕМА ДОРОГ ЗОНЫ ТАКСИ (РАБОТАЕТ АВТОНОМНО БЕЗ ИНТЕРНЕТА)
         const localRoadsData = {
             "type": "FeatureCollection",
             "features": [
-                { "type": "Feature", "properties": { "name": "Кульджинский тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
+                { "type": "Feature", "properties": { "name": "Кульджинский管 тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
                 { "type": "Feature", "properties": { "name": "ул. Мира (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1150, 43.3610], [77.1215, 43.3644], [77.1300, 43.3680]] } },
                 { "type": "Feature", "properties": { "name": "ул. Ленина (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1200, 43.3580], [77.1215, 43.3644], [77.1230, 43.3720]] } },
                 { "type": "Feature", "properties": { "name": "ул. Жансугурова (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1400, 43.3500], [77.1450, 43.3550], [77.1500, 43.3620]] } },
@@ -131,12 +146,10 @@
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-                // ИСПРАВЛЕННЫЙ И РАБОЧИЙ ГЕОКОДЕР (ПОЛНОСТЬЮ ЗАМЕНИТЕ СТАРЫЙ)
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
 
-            // Правильный, безопасный URL с косыми кавычками-бэктэками и знаком вопроса
             fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
                 .then(r => r.json())
                 .then(data => {
@@ -148,13 +161,7 @@
                     } else {
                         inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
-                    calculatePrice(); // Пересчитываем стоимость после обновления адреса
-                }).catch(() => {
-                    inputField.value = "Геометка установлена";
                     calculatePrice();
-                });
-        }
-
                 }).catch(() => {
                     inputField.value = "Геометка установлена";
                     calculatePrice();
@@ -183,7 +190,6 @@
                     document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
                     return;
                 }
-
                 if (zoneA === zoneB) { finalPrice = 500; }
                 else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; }
                 else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; }
@@ -191,7 +197,7 @@
                 document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
             } else {
                 if (latA && latB) {
-                    const R = 6371; 
+                    const R = 6371;
                     const dLat = (latB - latA) * Math.PI / 180;
                     const dLon = (lngB - lngA) * Math.PI / 180;
                     const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
@@ -201,7 +207,9 @@
                 }
             }
         }
- document.getElementById('geoBtn').addEventListener('click', () => {
+
+        // GPS кнопка определения местоположения
+        document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
                 navigator.geolocation.getCurrentPosition((position) => {
@@ -250,4 +258,3 @@
     </script>
 </body>
 </html>
-
