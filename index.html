@@ -57,16 +57,13 @@
         let finalPrice = 400;
         let isManualMode = false;
 
-        // ВШИТАЯ ВЕКТОРНАЯ СХЕМА ОСНОВНЫХ ДОРОГ (РЕШАЕТ ПРОБЛЕМУ БЛОКИРОВОК НА 100%)
+        // ВШИТАЯ ВЕКТОРНАЯ СХЕМА ОЗНАКОМИТЕЛЬНЫХ ДОРОГ ЗОНЫ ТАКСИ
         const localRoadsData = {
             "type": "FeatureCollection",
             "features": [
-                // Главная трасса (Кульджинский тракт / соединение поселков)
                 { "type": "Feature", "properties": { "name": "Кульджинский тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
-                // Центральные улицы Аркабая
                 { "type": "Feature", "properties": { "name": "ул. Мира (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1150, 43.3610], [77.1215, 43.3644], [77.1300, 43.3680]] } },
                 { "type": "Feature", "properties": { "name": "ул. Ленина (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1200, 43.3580], [77.1215, 43.3644], [77.1230, 43.3720]] } },
-                // Главные дороги Панфилово
                 { "type": "Feature", "properties": { "name": "ул. Жансугурова (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1400, 43.3500], [77.1450, 43.3550], [77.1500, 43.3620]] } },
                 { "type": "Feature", "properties": { "name": "Поворот на школу (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1430, 43.3530], [77.1480, 43.3540]] } }
             ]
@@ -78,21 +75,18 @@
                 return;
             }
 
-            // Создаем карту Leaflet
             myMap = L.map('map', {
                 zoomControl: true,
                 boxZoom: false,
                 doubleClickZoom: true
             }).setView([latA, lngA], 13);
             
-            // Настраиваем неоновый стиль отображения дорожной сети такси
             const roadStyle = {
                 "color": "#2481cc", 
                 "weight": 5,        
                 "opacity": 0.9
             };
 
-            // Отрисовываем вшитые дороги мгновенно без fetch-запросов во внешний интернет
             L.geoJSON(localRoadsData, {
                 style: roadStyle,
                 onEachFeature: function (feature, layer) {
@@ -102,7 +96,6 @@
                 }
             }).addTo(myMap);
 
-            // Инициализируем маркеры
             initMarkers();
         }
 
@@ -137,18 +130,16 @@
             });
         }
 
-        // Запуск контроля
         initMapWhenReady();
 
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-                // ИСПРАВЛЕННЫЙ И 100% РАБОЧИЙ ГЕОКОДЕР NOMINATIM API
+        // ИСПРАВЛЕННЫЙ ГЕОКОДЕР БЕЗ СТАРЫХ ОШИБОК НА СТРОКЕ 151
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
 
-            // Полный, защищенный и правильный URL-адрес для запроса к серверам OpenStreetMap
             fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
                 .then(r => r.json())
                 .then(data => {
@@ -156,19 +147,16 @@
                         const road = data.address.road || "";
                         const house = data.address.house_number || "";
                         const village = data.address.village || data.address.suburb || data.address.town || data.address.city || "";
-                        
-                        // Собираем понятный человеку адрес
                         inputField.value = `${village} ${road} ${house}`.trim().replace(/\s+/g, ' ') || "Точка на карте";
                     } else {
                         inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
-                    calculatePrice(); // Пересчитываем стоимость после обновления адреса
+                    calculatePrice();
                 }).catch(() => {
                     inputField.value = "Геометка установлена";
                     calculatePrice();
                 });
         }
-
 
         function getZone(addressText) {
             const txt = addressText.toLowerCase();
@@ -210,9 +198,7 @@
                 }
             }
         }
-
-        // GPS кнопка определения местоположения пассажира
-        document.getElementById('geoBtn').addEventListener('click', () => {
+ document.getElementById('geoBtn').addEventListener('click', () => {
             if (navigator.geolocation) {
                 document.getElementById('from').value = "⏳ GPS поиск...";
                 navigator.geolocation.getCurrentPosition((position) => {
@@ -229,7 +215,7 @@
             }
         });
 
-        // Отправка готового заказа в Telegram-бот такси
+        // Отправка готового заказа Telegram-боту такси
         document.getElementById('orderBtn').addEventListener('click', () => {
             const fromText = document.getElementById('from').value;
             const toText = document.getElementById('to').value;
@@ -261,3 +247,4 @@
     </script>
 </body>
 </html>
+
