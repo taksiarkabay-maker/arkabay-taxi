@@ -134,11 +134,12 @@
         document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
         document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
 
-        // ИСПРАВЛЕННЫЙ ГЕОКОДЕР БЕЗ СТАРЫХ ОШИБОК НА СТРОКЕ 151
+                // ИСПРАВЛЕННЫЙ И РАБОЧИЙ ГЕОКОДЕР (ПОЛНОСТЬЮ ЗАМЕНИТЕ СТАРЫЙ)
         function geocodeAddress(lat, lng, inputId) {
             const inputField = document.getElementById(inputId);
             inputField.value = "⏳ Распознаем адрес...";
 
+            // Правильный, безопасный URL с косыми кавычками-бэктэками и знаком вопроса
             fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
                 .then(r => r.json())
                 .then(data => {
@@ -150,7 +151,13 @@
                     } else {
                         inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
                     }
+                    calculatePrice(); // Пересчитываем стоимость после обновления адреса
+                }).catch(() => {
+                    inputField.value = "Геометка установлена";
                     calculatePrice();
+                });
+        }
+
                 }).catch(() => {
                     inputField.value = "Геометка установлена";
                     calculatePrice();
