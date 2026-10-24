@@ -3,260 +3,64 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Заказ Такси</title>
-    <!-- Официальный скрипт Telegram WebApp API -->
-    <script src="https://telegram.org"></script>
+    <title>Карта Такси</title>
     
-    <!-- Подключаем только JavaScript Leaflet через стабильный Cloudflare CDN -->
+    <!-- Стабильное подключение библиотек карт Leaflet через Cloudflare CDN -->
+    <link rel="stylesheet" href="https://cloudflare.com" />
     <script src="https://cloudflare.com"></script>
     
     <style>
-        /* ВСТРАИВАЕМ БАЗОВЫЕ КРИТИЧЕСКИЕ СТИЛИ LEAFLET НАПРЯМУЮ, ЧТОБЫ ИЗБЕЖАТЬ ОШИБОК СЕТИ */
-        .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container, .leaflet-map-pane svg, .leaflet-map-pane canvas, .leaflet-zoom-box, .leaflet-image-layer, .leaflet-layer { position: absolute; left: 0; top: 0; }
-        .leaflet-container { overflow: hidden; -ms-touch-action: none; touch-action: none; cursor: -webkit-grab; cursor: -moz-grab; cursor: grab; -webkit-tap-highlight-color: transparent; }
-        .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow { -webkit-user-select: none; -moz-user-select: none; user-select: none; -webkit-user-drag: none; }
-        .leaflet-tile { filter: inherit; visibility: hidden; }
-        .leaflet-tile-loaded { visibility: inherit; }
-        .leaflet-zoom-animated { -webkit-transform-origin: 0 0; -ms-transform-origin: 0 0; transform-origin: 0 0; }
-        .leaflet-popup { position: absolute; text-align: center; margin-bottom: 20px; }
-        .leaflet-popup-content-wrapper { padding: 1px; text-align: left; border-radius: 12px; background: white; box-shadow: 0 3px 14px rgba(0,0,0,0.4); }
-        .leaflet-popup-content { margin: 13px 19px; line-height: 1.4; font-size: 14px; }
-        
-        /* Основные стили оформления интерфейса такси */
-        body { font-family: Arial, sans-serif; margin: 0; padding: 0; background-color: #fff; }
-        .header { display: flex; flex-direction: column; align-items: center; padding: 15px 10px 5px 10px; background-color: #f5f5f5; text-align: center; }
-        #map { height: 40vh; width: 100%; background: #e5e3df; border-bottom: 2px solid #ccc; position: relative; }
-        .container { padding: 15px; }
-        .input-group { margin-bottom: 10px; }
-        input, select { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 8px; font-size: 14px; }
-        button { width: 100%; padding: 12px; background: #2481cc; color: #fff; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 15px; }
-        .geo-btn { background: #ff9800; margin-bottom: 8px; padding: 10px; font-size: 14px; }
-        .price-box { background: #f5f5f5; padding: 12px; border-radius: 8px; text-align: center; font-weight: bold; margin-bottom: 10px; font-size: 16px; border: 1px solid #ddd; color: #2481cc; }
+        /* Растягиваем карту на всю ширину и высоту экрана устройства */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #fff;
+        }
+        #map {
+            width: 100%;
+            height: 100%;
+            position: relative;
+        }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h2>Заказ Такси Аркабай - Панфилово</h2>
-    </div>
-    
-    <!-- Окно карты -->
+
+    <!-- Единственный контейнер для отображения карты -->
     <div id="map"></div>
-    
-    <div class="container">
-        <button id="geoBtn" class="geo-btn">📍 Автоматически определить где я</button>
-        <div class="input-group"><input type="text" id="from" placeholder="Откуда (Точка А)"></div>
-        <div class="input-group"><input type="text" id="to" placeholder="Куда (Точка Б)"></div>
-        <div class="input-group"><input type="text" id="comment" placeholder="Комментарий к заказу"></div>
-        <div class="input-group">
-            <select id="paymentMethod">
-                <option value="💵 Наличные">💵 Наличные</option>
-                <option value="📱 Kaspi перевод">📱 Kaspi перевод</option>
-            </select>
-        </div>
-        <div class="price-box" id="priceDisplay">Стоимость: 400 ₸</div>
-        <button id="orderBtn">Заказать такси</button>
-    </div>
 
     <script type="text/javascript">
-        let tg = window.Telegram?.WebApp || null;
-        if (tg) tg.expand();
-
-        let myMap;
-        let markerA, markerB;
-        let latA = 43.3644, lngA = 77.1215; // Центр поселка Аркабай по умолчанию
-        let latB = null, lngB = null;
-        let finalPrice = 400;
-        let isManualMode = false;
-
-        // ВШИТАЯ ВЕКТОРНАЯ СХЕМА ДОРОГ ЗОНЫ ТАКСИ (РАБОТАЕТ АВТОНОМНО БЕЗ ИНТЕРНЕТА)
-        const localRoadsData = {
-            "type": "FeatureCollection",
-            "features": [
-                { "type": "Feature", "properties": { "name": "Кульджинский тракт" }, "geometry": { "type": "LineString", "coordinates": [[77.0800, 43.3500], [77.1500, 43.3600], [77.2000, 43.3700]] } },
-                { "type": "Feature", "properties": { "name": "ул. Мира (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1150, 43.3610], [77.1215, 43.3644], [77.1300, 43.3680]] } },
-                { "type": "Feature", "properties": { "name": "ул. Ленина (Аркабай)" }, "geometry": { "type": "LineString", "coordinates": [[77.1200, 43.3580], [77.1215, 43.3644], [77.1230, 43.3720]] } },
-                { "type": "Feature", "properties": { "name": "ул. Жансугурова (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1400, 43.3500], [77.1450, 43.3550], [77.1500, 43.3620]] } },
-                { "type": "Feature", "properties": { "name": "Поворот на школу (Панфилово)" }, "geometry": { "type": "LineString", "coordinates": [[77.1430, 43.3530], [77.1480, 43.3540]] } }
-            ]
-        };
-
+        // Защитная функция: ждем, пока объект L полностью загрузится в память браузера
         function initMapWhenReady() {
             if (typeof L === 'undefined') {
-                setTimeout(initMapWhenReady, 100);
+                setTimeout(initMapWhenReady, 50);
                 return;
             }
 
-            myMap = L.map('map', {
+            // Координаты центра поселка Аркабай (Талгарский район)
+            const lat = 43.3644;
+            const lng = 77.1215;
+
+            // Создаем карту внутри блока id="map" с базовым зумом 14
+            const myMap = L.map('map', {
                 zoomControl: true,
                 boxZoom: false,
                 doubleClickZoom: true
-            }).setView([latA, lngA], 13);
+            }).setView([lat, lng], 14);
             
-            const roadStyle = {
-                "color": "#2481cc", 
-                "weight": 5,        
-                "opacity": 0.9
-            };
-
-            L.geoJSON(localRoadsData, {
-                style: roadStyle,
-                onEachFeature: function (feature, layer) {
-                    if (feature.properties && feature.properties.name) {
-                        layer.bindPopup("<b>" + feature.properties.name + "</b>");
-                    }
-                }
+            // Подключаем стабильный слой карт OpenStreetMap по протоколу HTTPS
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '© OpenStreetMap'
             }).addTo(myMap);
 
-            initMarkers();
+            // Ставим один аккуратный маркер в центр карты
+            L.marker([lat, lng]).addTo(myMap);
         }
 
-        function initMarkers() {
-            if (markerA) return;
-            
-            markerA = L.marker([latA, lngA], {draggable: true}).addTo(myMap);
-            geocodeAddress(latA, lngA, 'from');
-
-            markerA.on('dragend', function () {
-                const position = markerA.getLatLng();
-                latA = position.lat; lngA = position.lng;
-                isManualMode = false;
-                geocodeAddress(latA, lngA, 'from');
-            });
-
-            myMap.on('click', function (e) {
-                latB = e.latlng.lat; lngB = e.latlng.lng;
-                isManualMode = false;
-
-                if (markerB) {
-                    markerB.setLatLng(e.latlng);
-                } else {
-                    markerB = L.marker([latB, lngB], {draggable: true}).addTo(myMap);
-                    markerB.on('dragend', function () {
-                        const pos = markerB.getLatLng();
-                        latB = pos.lat; lngB = pos.lng;
-                        geocodeAddress(latB, lngB, 'to');
-                    });
-                }
-                geocodeAddress(latB, lngB, 'to');
-            });
-        }
-
+        // Запускаем безопасную инициализацию карты
         initMapWhenReady();
-
-        document.getElementById('from').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
-        document.getElementById('to').addEventListener('input', () => { isManualMode = true; calculatePrice(); });
-
-        function geocodeAddress(lat, lng, inputId) {
-            const inputField = document.getElementById(inputId);
-            inputField.value = "⏳ Распознаем адрес...";
-
-            fetch(`https://openstreetmap.org{lat}&lon=${lng}&accept-language=ru`)
-                .then(r => r.json())
-                .then(data => {
-                    if (data.address) {
-                        const road = data.address.road || "";
-                        const house = data.address.house_number || "";
-                        const village = data.address.village || data.address.suburb || data.address.town || data.address.city || "";
-                        inputField.value = `${village} ${road} ${house}`.trim().replace(/\s+/g, ' ') || "Точка на карте";
-                    } else {
-                        inputField.value = `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
-                    }
-                    calculatePrice();
-                }).catch(() => {
-                    inputField.value = "Геометка установлена";
-                    calculatePrice();
-                });
-        }
-
-        function getZone(addressText) {
-            const txt = addressText.toLowerCase();
-            if (txt.includes('аркабай') || txt.includes('аркабаи')) return 'arkabay';
-            if (txt.includes('панфилово') || txt.includes('панфилов')) return 'panfilovo';
-            if (txt.includes('талгар')) return 'talgar';
-            if (txt.includes('алматы') || txt.includes('алмата') || txt.includes('город')) return 'almaty';
-            return 'unknown';
-        }
-
-        function calculatePrice() {
-            const fromVal = document.getElementById('from').value;
-            const toVal = document.getElementById('to').value;
-
-            if (isManualMode && fromVal && toVal) {
-                const zoneA = getZone(fromVal);
-                const zoneB = getZone(toVal);
-
-                if (zoneA === 'unknown' || zoneB === 'unknown') {
-                    finalPrice = 400;
-                    document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
-                    return;
-                }
-
-                if (zoneA === zoneB) { finalPrice = 500; }
-                else if ((zoneA === 'arkabay' && zoneB === 'panfilovo') || (zoneA === 'panfilovo' && zoneB === 'arkabay')) { finalPrice = 800; }
-                else if (zoneA === 'talgar' || zoneB === 'talgar') { finalPrice = 2500; }
-                else if (zoneA === 'almaty' || zoneB === 'almaty') { finalPrice = 4000; }
-                document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸`;
-            } else {
-                if (latA && latB) {
-                    const R = 6371;
-                    const dLat = (latB - latA) * Math.PI / 180;
-                    const dLon = (lngB - lngA) * Math.PI / 180;
-                    const a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(latA * Math.PI / 180) * Math.cos(latB * Math.PI / 180) * Math.sin(dLon/2) * Math.sin(dLon/2);
-                    const distanceKm = R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
-                    finalPrice = Math.round(400 + (distanceKm * 80));
-                    document.getElementById('priceDisplay').innerText = `Стоимость: ${finalPrice} ₸ (${distanceKm.toFixed(2)} км)`;
-                }
-            }
-        }
-
-        // GPS кнопка определения местоположения
-        document.getElementById('geoBtn').addEventListener('click', () => {
-            if (navigator.geolocation) {
-                document.getElementById('from').value = "⏳ GPS поиск...";
-                navigator.geolocation.getCurrentPosition((position) => {
-                    latA = position.coords.latitude;
-                    lngA = position.coords.longitude;
-                    if (myMap) {
-                        myMap.setView([latA, lngA], 16);
-                        if (markerA) markerA.setLatLng([latA, lngA]);
-                    }
-                    geocodeAddress(latA, lngA, 'from');
-                }, () => {
-                    document.getElementById('from').value = "Не удалось определить GPS";
-                });
-            }
-        });
-
-        // Отправка готового заказа Telegram-боту такси
-        document.getElementById('orderBtn').addEventListener('click', () => {
-            const fromText = document.getElementById('from').value;
-            const toText = document.getElementById('to').value;
-            const commentText = document.getElementById('comment').value || "No";
-            const paymentText = document.getElementById('paymentMethod').value;
-
-            if (!fromText || fromText.startsWith("⏳") || !toText || toText.startsWith("⏳")) {
-                alert("Пожалуйста, отметьте точки A и B на карте или введите текст!");
-                return;
-            }
-
-            const orderData = { 
-                from_address: fromText, 
-                to_address: toText, 
-                comment: commentText, 
-                payment_method: paymentText, 
-                price: finalPrice, 
-                lat: latA, 
-                lng: lngA 
-            };
-
-            if (tg) {
-                tg.sendData(JSON.stringify(orderData));
-                tg.close();
-            } else {
-                alert("Локальный тест:\n" + JSON.stringify(orderData, null, 2));
-            }
-        });
     </script>
 </body>
 </html>
-
